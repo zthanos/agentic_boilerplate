@@ -1,0 +1,20 @@
+FROM elixir:1.19.2-otp-28
+
+# Build deps for NIFs / compilation, sqlite runtime+headers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    bash \
+    curl \
+    ca-certificates \
+    sqlite3 \
+    libsqlite3-dev \
+    inotify-tools \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ENV HEX_HOME=/root/.hex \
+    MIX_HOME=/root/.mix
+
+EXPOSE 4000
