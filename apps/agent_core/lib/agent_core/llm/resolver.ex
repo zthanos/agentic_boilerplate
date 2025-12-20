@@ -1,5 +1,5 @@
 defmodule AgentCore.Llm.Resolver do
-  alias AgentCore.Llm.InvocationConfig
+  alias AgentCore.Llm.{InvocationConfig, Overrides}
 
   @clear :__clear__
 
@@ -9,8 +9,10 @@ defmodule AgentCore.Llm.Resolver do
     budgets: :merge,
 
     # lists
-    tools: :union,       # profile ∪ overrides
-    stop_list: :replace  # overrides replace profile
+    # profile ∪ overrides
+    tools: :union,
+    # overrides replace profile
+    stop_list: :replace
   }
 
   @doc """
@@ -26,12 +28,24 @@ defmodule AgentCore.Llm.Resolver do
       e.g. %{generation: %{temperature: :__clear__}}
   """
   def resolve(profile, overrides \\ %{}, policy \\ @merge_policy) do
-    overrides = normalize_overrides(overrides)
+    # overrides = normalize_overrides(overrides)
+    overrides_map =
+      case overrides do
+        %Overrides{} = o ->
+          Overrides.to_map(o)
+
+        other ->
+          case Overrides.from(other, strict: true) do
+            {:ok, o} -> Overrides.to_map(o)
+            {:error, errs} -> raise ArgumentError, "Invalid overrides: #{inspect(errs)}"
+          end
+      end
+
     base = profile_to_base_map(profile)
 
     merged =
       base
-      |> deep_merge(overrides, policy)
+      |> deep_merge(overrides_map, policy)
       |> canonicalize_final()
 
     %InvocationConfig{
@@ -49,15 +63,13 @@ defmodule AgentCore.Llm.Resolver do
     }
   end
 
-
-
   # -------------------------
   # Input normalization
   # -------------------------
 
-  defp normalize_overrides(overrides) when is_list(overrides), do: Map.new(overrides)
-  defp normalize_overrides(overrides) when is_map(overrides), do: overrides
-  defp normalize_overrides(_), do: %{}
+  # defp normalize_overrides(overrides) when is_list(overrides), do: Map.new(overrides)
+  # defp normalize_overrides(overrides) when is_map(overrides), do: overrides
+  # defp normalize_overrides(_), do: %{}
 
   # Convert profile struct into a plain map with only the domains we care about.
   # This prevents accidental merging of internal fields.
@@ -74,10 +86,10 @@ defmodule AgentCore.Llm.Resolver do
       # fallback: generation.stop (legacy)
       stop_list:
         Map.get(profile, :stop_list) ||
-          (case Map.get(profile, :generation) do
+          case Map.get(profile, :generation) do
             %AgentCore.Llm.GenerationParams{stop: stops} -> stops
             _ -> []
-          end)
+          end
     }
   end
 
@@ -90,7 +102,6 @@ defmodule AgentCore.Llm.Resolver do
       merge_value(key, left, right, policy)
     end)
   end
-
 
   defp merge_value(_key, _left, @clear, _policy), do: default_for_clear()
   defp merge_value(_key, left, right, _policy) when right == nil, do: left
@@ -198,9 +209,13 @@ defmodule AgentCore.Llm.Resolver do
 
   defp canonicalize_stop_list_in_map(m) do
     case Map.fetch(m, :stop_list) do
-      {:ok, v} when v == @clear -> Map.put(m, :stop_list, @clear)
+      {:ok, v} when v == @clear ->
+        Map.put(m, :stop_list, @clear)
+
       {:ok, v} ->
-        Map.put(m, :stop_list,
+        Map.put(
+          m,
+          :stop_list,
           v
           |> List.wrap()
           |> Enum.map(&normalize_stop/1)
@@ -209,15 +224,20 @@ defmodule AgentCore.Llm.Resolver do
           |> Enum.sort()
         )
 
-      :error -> m
+      :error ->
+        m
     end
   end
 
   defp canonicalize_tools_in_map(m) do
     case Map.fetch(m, :tools) do
-      {:ok, v} when v == @clear -> Map.put(m, :tools, @clear)
+      {:ok, v} when v == @clear ->
+        Map.put(m, :tools, @clear)
+
       {:ok, v} ->
-        Map.put(m, :tools,
+        Map.put(
+          m,
+          :tools,
           v
           |> List.wrap()
           |> Enum.map(&normalize_tool/1)
@@ -226,7 +246,8 @@ defmodule AgentCore.Llm.Resolver do
           |> Enum.sort()
         )
 
-      :error -> m
+      :error ->
+        m
     end
   end
 
@@ -238,10 +259,12 @@ defmodule AgentCore.Llm.Resolver do
   defp normalize_stop(_), do: nil
 
   defp normalize_tool(t) when is_atom(t), do: Atom.to_string(t)
+
   defp normalize_tool(t) when is_binary(t) do
     s = String.trim(t)
     if s == "", do: nil, else: s
   end
+
   defp normalize_tool(_), do: nil
 
   defp drop_nil_map_values(map) when is_map(map) do

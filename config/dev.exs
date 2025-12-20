@@ -1,5 +1,14 @@
 import Config
 
+config :agent_core, AgentCore.Repo,
+  database: Path.expand("data/agent_core.sqlite3", File.cwd!()),
+  pool_size: 5
+
+config :agent_core, ecto_repos: [AgentCore.Repo]
+
+config :agent_core, AgentCore.Llm.Runs,
+  store: AgentCore.Llm.RunStore.Ecto
+
 # Configure your database
 config :agent_web, AgentWeb.Repo,
   database: Path.expand("../agent_web_dev.db", __DIR__),

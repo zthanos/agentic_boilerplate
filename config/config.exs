@@ -16,6 +16,10 @@
 # General application configuration
 import Config
 
+config :agent_core, AgentCore.Llm.Runs,
+  store: AgentCore.Llm.RunStore.Ecto
+
+
 config :agent_web,
   ecto_repos: [AgentWeb.Repo],
   generators: [timestamp_type: :utc_datetime]

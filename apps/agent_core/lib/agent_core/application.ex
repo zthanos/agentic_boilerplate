@@ -8,6 +8,7 @@ defmodule AgentCore.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      AgentCore.Repo
       # Starts a worker by calling: AgentCore.Worker.start_link(arg)
       # {AgentCore.Worker, arg}
     ]

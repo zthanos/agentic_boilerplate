@@ -117,6 +117,7 @@ defmodule AgentCore.Llm.Validator do
   defp default_float(v, _default), do: v
 
   defp normalize_tags(nil), do: []
+
   defp normalize_tags(tags) when is_list(tags) do
     tags
     |> Enum.map(&normalize_string/1)
@@ -159,8 +160,7 @@ defmodule AgentCore.Llm.Validator do
     add_error(errors, "provider.type", :unsupported, "Unsupported provider type", other)
   end
 
-  defp validate_base_url(errors, nil), do: errors
-
+  # NOTE: strict binary clause; require_string("provider.base_url", ...) is called before.
   defp validate_base_url(errors, base_url) when is_binary(base_url) do
     uri = URI.parse(base_url)
 
@@ -181,10 +181,6 @@ defmodule AgentCore.Llm.Validator do
     else
       add_error(errors, "provider.base_url", :invalid, "base_url should typically end with /v1 for OpenAI-compatible servers", base_url)
     end
-  end
-
-  defp validate_base_url(errors, other) do
-    add_error(errors, "provider.base_url", :invalid, "base_url must be a string", other)
   end
 
   # ---------------------------------------------------------------------------
@@ -276,20 +272,13 @@ defmodule AgentCore.Llm.Validator do
   # Generic validators / helpers
   # ---------------------------------------------------------------------------
 
-  defp require_string(errors, field, nil) do
-    add_error(errors, field, :required, "Value is required", nil)
-  end
-
+  # NOTE: strict binary clause to avoid Dialyzer unreachable-clauses when call-sites are typed.
   defp require_string(errors, field, value) when is_binary(value) do
     if String.trim(value) == "" do
       add_error(errors, field, :required, "Value is required", value)
     else
       errors
     end
-  end
-
-  defp require_string(errors, field, value) do
-    add_error(errors, field, :required, "Value must be a string", value)
   end
 
   # Ensures "value is a struct of module `mod`".
