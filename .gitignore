@@ -8,3 +8,24 @@ erl_crash.dump
 *.beam
 /config/*.secret.exs
 .elixir_ls/
+
+# SQLite database files
+*.db
+*.db-*
+*-journal
+
+mix.lock
+
+# Node/Assets
+/assets/node_modules/
+/npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Static artifacts
+/priv/static/
+
+# Environment
+.env
+.env.*
+!.env.example
