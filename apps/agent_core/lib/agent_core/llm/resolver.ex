@@ -3,6 +3,16 @@ defmodule AgentCore.Llm.Resolver do
 
   @clear :__clear__
 
+  @merge_policy %{
+    # domains (maps) -> deep merged anyway
+    generation: :merge,
+    budgets: :merge,
+
+    # lists
+    tools: :union,       # profile ∪ overrides
+    stop_list: :replace  # overrides replace profile
+  }
+
   @doc """
   Resolve a profile plus runtime overrides into a deterministic InvocationConfig snapshot.
 
@@ -15,14 +25,13 @@ defmodule AgentCore.Llm.Resolver do
       e.g. %{stop_list: :__clear__}
       e.g. %{generation: %{temperature: :__clear__}}
   """
-  def resolve(profile, overrides \\ %{}) do
+  def resolve(profile, overrides \\ %{}, policy \\ @merge_policy) do
     overrides = normalize_overrides(overrides)
-
     base = profile_to_base_map(profile)
 
     merged =
       base
-      |> deep_merge(overrides)
+      |> deep_merge(overrides, policy)
       |> canonicalize_final()
 
     %InvocationConfig{
@@ -39,6 +48,8 @@ defmodule AgentCore.Llm.Resolver do
       fingerprint: fingerprint(merged)
     }
   end
+
+
 
   # -------------------------
   # Input normalization
@@ -74,28 +85,46 @@ defmodule AgentCore.Llm.Resolver do
   # Deep merge with clear semantics
   # -------------------------
 
-  defp deep_merge(base, overrides) when is_map(base) and is_map(overrides) do
-    Map.merge(base, overrides, fn _key, left, right ->
-      merge_value(left, right)
+  defp deep_merge(base, overrides, policy) when is_map(base) and is_map(overrides) do
+    Map.merge(base, overrides, fn key, left, right ->
+      merge_value(key, left, right, policy)
     end)
   end
 
-  defp merge_value(_left, @clear), do: default_for_clear()
-  defp merge_value(left, right) when right == nil, do: left
 
-  # both maps => recurse
-  defp merge_value(left, right) when is_map(left) and is_map(right) do
-    deep_merge(left, right)
+  defp merge_value(_key, _left, @clear, _policy), do: default_for_clear()
+  defp merge_value(_key, left, right, _policy) when right == nil, do: left
+
+  # both maps => recurse (deep merge)
+  defp merge_value(_key, left, right, policy) when is_map(left) and is_map(right) do
+    deep_merge(left, right, policy)
   end
 
-  # lists: we keep right-biased behavior by default,
-  # but we’ll canonicalize stop_list/tools later with explicit rules
-  defp merge_value(_left, right) when is_list(right), do: right
+  # lists => apply per-key policy
+  defp merge_value(key, left, right, policy) when is_list(left) and is_list(right) do
+    list_policy = Map.get(policy, key, :replace)
+    merge_list_by_policy(list_policy, left, assumed_list(right))
+  end
+
+  # if profile has nil and override has list (or vice versa)
+  defp merge_value(key, left, right, policy) when is_list(right) do
+    list_policy = Map.get(policy, key, :replace)
+    merge_list_by_policy(list_policy, assumed_list(left), assumed_list(right))
+  end
 
   # scalar => override
-  defp merge_value(_left, right), do: right
+  defp merge_value(_key, _left, right, _policy), do: right
 
   defp default_for_clear(), do: nil
+
+  defp assumed_list(nil), do: []
+  defp assumed_list(v) when is_list(v), do: v
+  defp assumed_list(_), do: []
+
+  defp merge_list_by_policy(:replace, _left, right), do: right
+  defp merge_list_by_policy(:append, left, right), do: left ++ right
+  defp merge_list_by_policy(:union, left, right), do: left ++ right
+  defp merge_list_by_policy(_unknown, _left, right), do: right
 
   # -------------------------
   # Canonicalization rules (determinism)

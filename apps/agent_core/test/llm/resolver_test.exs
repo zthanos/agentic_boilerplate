@@ -41,7 +41,7 @@ defmodule AgentCore.Llm.ResolverTest do
       assert config.stop_list == ["###", "END"]
 
       # tools normalized (atoms to string + uniq + sorted)
-      assert config.tools == ["file_search", "json_schema"]
+      assert config.tools == ["file_search", "json_schema", "web_search"]
 
       assert is_binary(config.fingerprint)
       assert byte_size(config.fingerprint) == 64
@@ -96,8 +96,8 @@ defmodule AgentCore.Llm.ResolverTest do
       assert config_a.stop_list == ["###", "END"]
       assert config_b.stop_list == ["###", "END"]
 
-      assert config_a.tools == ["file_search", "json_schema"]
-      assert config_b.tools == ["file_search", "json_schema"]
+      assert config_a.tools == ["file_search", "json_schema", "web_search"]
+      assert config_b.tools == ["file_search", "json_schema", "web_search"]
 
       assert config_a.fingerprint == config_b.fingerprint
     end
@@ -111,7 +111,7 @@ defmodule AgentCore.Llm.ResolverTest do
 
     test "tools supports atom and string, trims blanks, uniq + sorted" do
       config = Resolver.resolve(@profile, %{tools: ["  ", :json_schema, "file_search", "file_search"]})
-      assert config.tools == ["file_search", "json_schema"]
+      assert config.tools == ["file_search", "json_schema", "web_search"]
     end
 
     test "generation numeric parsing from string works (temperature/top_p/max_output_tokens)" do
@@ -140,5 +140,31 @@ defmodule AgentCore.Llm.ResolverTest do
     assert %DateTime{} = config1.resolved_at
     assert %DateTime{} = config2.resolved_at
   end
+
+  describe "override policy for list fields" do
+    test "tools default policy is :union (profile tools are preserved)" do
+      overrides = %{tools: [:json_schema, "file_search"]}
+      config = Resolver.resolve(@profile, overrides)
+
+      assert config.tools == ["file_search", "json_schema", "web_search"]
+    end
+
+    test "stop_list default policy is :replace (profile stop_list is replaced)" do
+      overrides = %{stop_list: ["END"]}
+      config = Resolver.resolve(@profile, overrides)
+
+      assert config.stop_list == ["END"]
+    end
+
+    test "can override policy at call-site (tools :replace)" do
+      overrides = %{tools: [:json_schema, "file_search"]}
+
+      policy = %{tools: :replace, stop_list: :replace, generation: :merge, budgets: :merge}
+      config = Resolver.resolve(@profile, overrides, policy)
+
+      assert config.tools == ["file_search", "json_schema"]
+    end
+  end
+
 
 end

@@ -139,7 +139,7 @@ defmodule AgentCore.Llm.Validator do
   defp normalize_stop(_), do: nil
 
   # ---------------------------------------------------------------------------
-  # Provider validation
+  # Provider validation (typed; require_struct already executed)
   # ---------------------------------------------------------------------------
 
   defp validate_provider(errors, %Provider{} = p) do
@@ -152,8 +152,6 @@ defmodule AgentCore.Llm.Validator do
     |> validate_positive_int("provider.retry_backoff_ms", p.retry_backoff_ms, min: 0, max: 60_000)
     |> validate_map("provider.default_headers", p.default_headers)
   end
-
-  defp validate_provider(errors, _), do: errors
 
   defp validate_provider_type(errors, :openai_compatible), do: errors
 
@@ -190,7 +188,7 @@ defmodule AgentCore.Llm.Validator do
   end
 
   # ---------------------------------------------------------------------------
-  # Model validation
+  # Model validation (typed; require_struct already executed)
   # ---------------------------------------------------------------------------
 
   defp validate_model(errors, %ModelRef{} = m) do
@@ -199,10 +197,8 @@ defmodule AgentCore.Llm.Validator do
     |> validate_optional_pos_int("model.context_window", m.context_window, max: 1_000_000)
   end
 
-  defp validate_model(errors, _), do: errors
-
   # ---------------------------------------------------------------------------
-  # Generation params validation
+  # Generation params validation (typed; normalize_generation ensures struct)
   # ---------------------------------------------------------------------------
 
   defp validate_generation(errors, %GenerationParams{} = g) do
@@ -216,19 +212,18 @@ defmodule AgentCore.Llm.Validator do
     |> validate_stop_list(g.stop)
   end
 
-  defp validate_generation(errors, nil), do: errors
-
-  defp validate_generation(errors, other) do
-    add_error(errors, "generation", :invalid, "generation must be a GenerationParams struct", other)
-  end
-
   defp validate_stop_list(errors, nil), do: errors
 
   defp validate_stop_list(errors, stops) when is_list(stops) do
     valid? =
       Enum.all?(stops, fn
-        s when is_binary(s) -> byte_size(String.trim(s)) > 0
-        _ -> false
+        s when is_binary(s) ->
+          s
+          |> String.trim()
+          |> byte_size() > 0
+
+        _ ->
+          false
       end)
 
     if valid? do
@@ -238,12 +233,8 @@ defmodule AgentCore.Llm.Validator do
     end
   end
 
-  defp validate_stop_list(errors, other) do
-    add_error(errors, "generation.stop", :invalid, "stop must be a list of strings", other)
-  end
-
   # ---------------------------------------------------------------------------
-  # Budgets validation
+  # Budgets validation (typed; normalize_budgets ensures struct)
   # ---------------------------------------------------------------------------
 
   defp validate_budgets(errors, %Budgets{} = b) do
@@ -254,12 +245,6 @@ defmodule AgentCore.Llm.Validator do
     |> validate_optional_float_range("budgets.max_cost_eur", b.max_cost_eur, min: 0.0, max: 10_000.0)
     |> validate_optional_pos_int("budgets.max_steps", b.max_steps, max: 1_000)
     |> validate_budget_consistency(b)
-  end
-
-  defp validate_budgets(errors, nil), do: errors
-
-  defp validate_budgets(errors, other) do
-    add_error(errors, "budgets", :invalid, "budgets must be a Budgets struct", other)
   end
 
   defp validate_budget_consistency(errors, %Budgets{} = b) do
@@ -276,7 +261,7 @@ defmodule AgentCore.Llm.Validator do
   end
 
   # ---------------------------------------------------------------------------
-  # Tags validation
+  # Tags validation (typed; normalize_tags ensures list)
   # ---------------------------------------------------------------------------
 
   defp validate_tags(errors, tags) when is_list(tags) do
@@ -285,12 +270,6 @@ defmodule AgentCore.Llm.Validator do
     else
       add_error(errors, "tags", :invalid, "tags must be a list of strings", tags)
     end
-  end
-
-  defp validate_tags(errors, nil), do: errors
-
-  defp validate_tags(errors, other) do
-    add_error(errors, "tags", :invalid, "tags must be a list of strings", other)
   end
 
   # ---------------------------------------------------------------------------
@@ -313,8 +292,7 @@ defmodule AgentCore.Llm.Validator do
     add_error(errors, field, :required, "Value must be a string", value)
   end
 
-  # NOTE: This pattern ensures "value is a struct of module `mod`".
-  # It works because structs are maps with the __struct__ field set to the module.
+  # Ensures "value is a struct of module `mod`".
   defp require_struct(errors, _field, %mod{} = _value, mod), do: errors
 
   defp require_struct(errors, field, value, mod) do
