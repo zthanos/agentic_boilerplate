@@ -7,9 +7,18 @@ defmodule AgentCore.Llm.RunStore.Ecto do
   alias AgentCore.Llm.{RunSnapshot, RunRecord}
 
   @impl true
-  def put(%RunSnapshot{} = snap) do
-    overrides = deep_stringify_keys(snap.overrides || %{})
-    invocation_config = deep_stringify_keys(snap.invocation_config || %{})
+    def put(%RunSnapshot{} = snap) do
+    overrides =
+      snap.overrides
+      |> Kernel.||(%{})
+      |> deep_stringify_keys()
+      # |> deep_sort()  # optional
+
+    invocation_config =
+      snap.invocation_config
+      |> Kernel.||(%{})
+      |> deep_stringify_keys()
+      # |> deep_sort()  # optional
 
     attrs = %{
       fingerprint: snap.fingerprint,
@@ -19,8 +28,8 @@ defmodule AgentCore.Llm.RunStore.Ecto do
       model: to_string(snap.model),
       policy_version: snap.policy_version,
       resolved_at: snap.resolved_at,
-      overrides: overrides || %{},
-      invocation_config: invocation_config || %{}
+      overrides: overrides,
+      invocation_config: invocation_config
     }
 
     %RunRecord{}
@@ -39,6 +48,7 @@ defmodule AgentCore.Llm.RunStore.Ecto do
         end
     end
   end
+
 
   @impl true
   def get_by_fingerprint(fp) when is_binary(fp) do
@@ -88,5 +98,113 @@ defmodule AgentCore.Llm.RunStore.Ecto do
         term
     end
   end
+
+  def mark_started(fingerprint) when is_binary(fingerprint) do
+    now = DateTime.utc_now()
+
+    RunRecord
+    |> Repo.get(fingerprint)
+    |> case do
+      nil ->
+        {:error, :not_found}
+
+      rec ->
+        # Do not overwrite started_at if already set (idempotent)
+        attrs =
+          rec
+          |> Map.get(:started_at)
+          |> case do
+            nil -> %{status: "started", started_at: now}
+            _ -> %{status: "started"}
+          end
+
+        rec
+        |> RunRecord.changeset(attrs)
+        |> Repo.update()
+        |> case do
+          {:ok, _} -> {:ok, fingerprint}
+          {:error, cs} -> {:error, cs}
+        end
+    end
+  end
+
+  def mark_finished(fingerprint, outcome \\ %{}) when is_binary(fingerprint) and is_map(outcome) do
+    now = DateTime.utc_now()
+
+    RunRecord
+    |> Repo.get(fingerprint)
+    |> case do
+      nil ->
+        {:error, :not_found}
+
+      rec ->
+        latency_ms = compute_latency_ms(rec.started_at, now)
+
+        attrs = %{
+          status: "finished",
+          finished_at: now,
+          usage: Map.get(outcome, :usage) || Map.get(outcome, "usage"),
+          latency_ms: Map.get(outcome, :latency_ms) || Map.get(outcome, "latency_ms") || latency_ms
+        }
+
+        rec
+        |> RunRecord.changeset(attrs)
+        |> Repo.update()
+        |> case do
+          {:ok, _} -> {:ok, fingerprint}
+          {:error, cs} -> {:error, cs}
+        end
+    end
+  end
+
+  def mark_failed(fingerprint, error, outcome \\ %{})
+      when is_binary(fingerprint) do
+    now = DateTime.utc_now()
+
+    RunRecord
+    |> Repo.get(fingerprint)
+    |> case do
+      nil ->
+        {:error, :not_found}
+
+      rec ->
+        latency_ms = compute_latency_ms(rec.started_at, now)
+
+        attrs = %{
+          status: "failed",
+          finished_at: now,
+          error: normalize_error(error),
+          usage: Map.get(outcome, :usage) || Map.get(outcome, "usage"),
+          latency_ms: Map.get(outcome, :latency_ms) || Map.get(outcome, "latency_ms") || latency_ms
+        }
+
+        rec
+        |> RunRecord.changeset(attrs)
+        |> Repo.update()
+        |> case do
+          {:ok, _} -> {:ok, fingerprint}
+          {:error, cs} -> {:error, cs}
+        end
+    end
+  end
+
+  defp compute_latency_ms(nil, _now), do: nil
+  defp compute_latency_ms(%DateTime{} = started_at, %DateTime{} = now) do
+    diff_us = DateTime.diff(now, started_at, :microsecond)
+    div(max(diff_us, 0), 1000)
+  end
+
+  defp normalize_error(%Ecto.Changeset{} = cs) do
+    %{type: "changeset", errors: Ecto.Changeset.traverse_errors(cs, fn {msg, _} -> msg end)}
+  end
+
+  defp normalize_error(%{__exception__: true} = ex) do
+    %{type: "exception", module: inspect(ex.__struct__), message: Exception.message(ex)}
+  end
+
+  defp normalize_error(other) do
+    %{type: "error", value: inspect(other)}
+  end
+
 
 end

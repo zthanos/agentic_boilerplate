@@ -1,37 +1,48 @@
 defmodule AgentCore.Llm.ProviderRequest do
   @moduledoc """
-  Provider-agnostic request builder from InvocationConfig.
+  Provider-agnostic request contract.
 
-  Produces a normalized request map that provider-specific clients can translate
-  to their wire format.
+  This is the boundary between:
+  - Resolver / InvocationConfig
+  - Provider adapter (OpenAI/Azure/req_llm/Ollama/etc.)
   """
 
   alias AgentCore.Llm.InvocationConfig
+  alias AgentCore.Llm.Tools.ToolSpec
 
-  @spec build(InvocationConfig.t(), map()) :: map()
-  def build(%InvocationConfig{} = cfg, prompt) when is_map(prompt) do
-    %{
-      provider: cfg.provider,
-      model: cfg.model,
-      # generation params
-      generation: cfg.generation,
-      # IMPORTANT: single source-of-truth for stop
-      stop: cfg.stop_list,
-      # tool hints (if supported)
-      tools: cfg.tools,
-      prompt: prompt
-    }
-    |> drop_nil_or_empty()
-  end
+  @enforce_keys [:invocation, :input]
+  defstruct [
+    :invocation, # InvocationConfig.t()
+    :input,      # %{type: :chat | :completion, messages: [...], prompt: ...}
+    tools: [],   # [ToolSpec.t()] - canonical
+    metadata: %{} # trace ids, run fingerprint, etc.
+  ]
 
-  defp drop_nil_or_empty(map) do
-    map
-    |> Enum.reject(fn
-      {_k, nil} -> true
-      {_k, []} -> true
-      {_k, %{}} -> true
-      _ -> false
-    end)
-    |> Map.new()
+  @type input_type :: :chat | :completion
+
+  @type chat_message :: %{
+          required(:role) => :system | :user | :assistant | :tool,
+          optional(:content) => String.t(),
+          optional(:name) => String.t(),
+          optional(:tool_call_id) => String.t(),
+          optional(:metadata) => map()
+        }
+
+  @type input :: %{
+          required(:type) => input_type(),
+          optional(:messages) => [chat_message()],
+          optional(:prompt) => String.t()
+        }
+
+  @type t :: %__MODULE__{
+          invocation: InvocationConfig.t(),
+          input: input(),
+          tools: [ToolSpec.t()],
+          metadata: map()
+        }
+
+  @spec new(InvocationConfig.t(), input(), [ToolSpec.t()], map()) :: t()
+  def new(invocation, input, tools \\ [], metadata \\ %{}) do
+    %__MODULE__{invocation: invocation, input: input, tools: tools, metadata: metadata}
   end
 end
