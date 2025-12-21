@@ -1,21 +1,15 @@
 defmodule AgentCore.Llm.ProviderRequest do
-  @moduledoc """
-  Provider-agnostic request contract.
-
-  This is the boundary between:
-  - Resolver / InvocationConfig
-  - Provider adapter (OpenAI/Azure/req_llm/Ollama/etc.)
-  """
+  @moduledoc "Provider-agnostic request contract."
 
   alias AgentCore.Llm.InvocationConfig
   alias AgentCore.Llm.Tools.ToolSpec
 
   @enforce_keys [:invocation, :input]
   defstruct [
-    :invocation, # InvocationConfig.t()
-    :input,      # %{type: :chat | :completion, messages: [...], prompt: ...}
-    tools: [],   # [ToolSpec.t()] - canonical
-    metadata: %{} # trace ids, run fingerprint, etc.
+    :invocation,
+    :input,
+    tools: [],
+    metadata: %{}
   ]
 
   @type input_type :: :chat | :completion
@@ -41,7 +35,6 @@ defmodule AgentCore.Llm.ProviderRequest do
           metadata: map()
         }
 
-  @spec new(InvocationConfig.t(), input(), [ToolSpec.t()], map()) :: t()
   def new(invocation, input, tools \\ [], metadata \\ %{}) do
     %__MODULE__{invocation: invocation, input: input, tools: tools, metadata: metadata}
   end

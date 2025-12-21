@@ -1,19 +1,13 @@
 defmodule AgentCore.Llm.ProviderResponse do
-  @moduledoc """
-  Provider-agnostic response contract.
-
-  Keeps both:
-  - normalized fields for domain usage
-  - raw provider payload for debugging / audits
-  """
+  @moduledoc "Provider-agnostic response contract."
 
   @enforce_keys [:output_text]
   defstruct [
-    :output_text,    # normalized text output
-    raw: nil,        # provider raw response payload
-    usage: %{},      # token/cost/latency fields (normalized map)
-    finish_reason: nil, # e.g. "stop" | "length" | "tool_call" | ...
-    tool_calls: []   # normalized tool calls (internal canonical shape)
+    :output_text,
+    raw: nil,
+    usage: %{},
+    finish_reason: nil,
+    tool_calls: []
   ]
 
   @type tool_call :: %{
@@ -31,7 +25,6 @@ defmodule AgentCore.Llm.ProviderResponse do
           tool_calls: [tool_call()]
         }
 
-  @spec ok(String.t(), keyword()) :: t()
   def ok(text, opts \\ []) when is_binary(text) do
     %__MODULE__{
       output_text: text,

@@ -11,3 +11,6 @@ config :agent_core, ecto_repos: [AgentCore.Repo]
 
 config :agent_core, AgentCore.Llm.Runs,
   store: AgentCore.Llm.RunStore.Ecto
+
+config :agent_core, AgentCore.Llm.ProviderRouter,
+  openai: AgentCore.Llm.Providers.FakeProvider
