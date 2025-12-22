@@ -7,7 +7,7 @@ defmodule AgentCore.Llm.RunStore.Ecto do
   alias AgentCore.Llm.{RunSnapshot, RunRecord}
   alias AgentCore.RunStore.Serialization
 
-  @impl true
+    @impl true
     def put(%RunSnapshot{} = snap) do
     overrides =
       snap.overrides
@@ -71,6 +71,7 @@ defmodule AgentCore.Llm.RunStore.Ecto do
     {:ok, Repo.all(q) |> Enum.map(&to_snapshot/1)}
   end
 
+
   defp to_snapshot(%RunRecord{} = rec) do
     %RunSnapshot{
       fingerprint: rec.fingerprint,
@@ -85,6 +86,7 @@ defmodule AgentCore.Llm.RunStore.Ecto do
     }
   end
 
+  @impl true
   def mark_started(fingerprint) when is_binary(fingerprint) do
     now = DateTime.utc_now()
 
@@ -114,6 +116,7 @@ defmodule AgentCore.Llm.RunStore.Ecto do
     end
   end
 
+  @impl true
   def mark_finished(fingerprint, outcome \\ %{}) when is_binary(fingerprint) and is_map(outcome) do
     now = DateTime.utc_now()
 
@@ -143,6 +146,7 @@ defmodule AgentCore.Llm.RunStore.Ecto do
     end
   end
 
+  @impl true
   def mark_failed(fingerprint, error, outcome \\ %{})
       when is_binary(fingerprint) do
     now = DateTime.utc_now()

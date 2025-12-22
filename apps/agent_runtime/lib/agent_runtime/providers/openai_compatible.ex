@@ -85,7 +85,7 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
 
   defp http_post(url, body, api_key, timeout_ms) do
     headers =
-      [{"content-type", "application/json"}]
+      [{~c"content-type", ~c"application/json"}]
       |> maybe_auth(api_key)
 
     http_opts = [
@@ -110,7 +110,8 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
 
   defp maybe_auth(headers, nil), do: headers
   defp maybe_auth(headers, ""), do: headers
-  defp maybe_auth(headers, api_key), do: [{"authorization", "Bearer " <> api_key} | headers]
+  defp maybe_auth(headers, api_key), do: [{~c"authorization", to_charlist("Bearer " <> api_key)} | headers]
+
 
   defp json_encode(map) do
     {:ok, Jason.encode!(map)}
@@ -147,4 +148,6 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
 
   defp parse_response(_req, raw),
     do: {:error, {:unexpected_response_shape, raw}}
+
+
 end
