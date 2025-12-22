@@ -8,7 +8,9 @@ services:
     ports:
       - "4080:4000"
     extra_hosts:
-      - "host.docker.internal:host-gateway"      
+      - "host.docker.internal:host-gateway"     
+    env_file:
+      - ./.env       
     environment:
       MIX_ENV: dev
       PHX_SERVER: "true"
