@@ -28,7 +28,6 @@ defmodule AgentCore.Llm.Resolver do
       e.g. %{generation: %{temperature: :__clear__}}
   """
   def resolve(profile, overrides \\ %{}, policy \\ @merge_policy) do
-    # overrides = normalize_overrides(overrides)
     overrides_map =
       case overrides do
         %Overrides{} = o ->
@@ -41,12 +40,27 @@ defmodule AgentCore.Llm.Resolver do
           end
       end
 
+    # Extract trace_id from normalized overrides (do NOT keep it inside overrides snapshot)
+    trace_id =
+      Map.get(overrides_map, :trace_id) ||
+        Map.get(overrides_map, "trace_id")
+
+    overrides_map_for_merge =
+      overrides_map
+      |> Map.delete(:trace_id)
+      |> Map.delete("trace_id")
+
     base = profile_to_base_map(profile)
 
     merged =
       base
-      |> deep_merge(overrides_map, policy)
+      |> deep_merge(overrides_map_for_merge, policy)
       |> canonicalize_final()
+
+    # Canonical overrides snapshot should be based on the normalized map (not raw input)
+    overrides_snapshot =
+      overrides_map_for_merge
+      |> canonicalize_overrides()
 
     %InvocationConfig{
       profile_id: merged.profile_id,
@@ -58,21 +72,24 @@ defmodule AgentCore.Llm.Resolver do
       tools: merged.tools,
       stop_list: merged.stop_list,
       resolved_at: DateTime.utc_now(),
-      overrides: canonicalize_overrides(overrides),
-      fingerprint: fingerprint(merged)
+      overrides: overrides_snapshot,
+      fingerprint: fingerprint(merged),
+
+      # safe: nil remains nil (NOT "nil")
+      policy_version:
+        case Map.get(profile, :policy_version) do
+          nil -> nil
+          v -> to_string(v)
+        end,
+
+      trace_id: trace_id
     }
   end
 
   # -------------------------
-  # Input normalization
+  # Profile -> base map
   # -------------------------
 
-  # defp normalize_overrides(overrides) when is_list(overrides), do: Map.new(overrides)
-  # defp normalize_overrides(overrides) when is_map(overrides), do: overrides
-  # defp normalize_overrides(_), do: %{}
-
-  # Convert profile struct into a plain map with only the domains we care about.
-  # This prevents accidental merging of internal fields.
   defp profile_to_base_map(profile) do
     %{
       profile_id: Map.fetch!(profile, :id),
@@ -82,6 +99,7 @@ defmodule AgentCore.Llm.Resolver do
       generation: Map.get(profile, :generation, %{}),
       budgets: Map.get(profile, :budgets, %{}),
       tools: Map.get(profile, :tools, []),
+
       # preferred: explicit profile.stop_list
       # fallback: generation.stop (legacy)
       stop_list:
@@ -103,38 +121,53 @@ defmodule AgentCore.Llm.Resolver do
     end)
   end
 
-  defp merge_value(_key, _left, @clear, _policy), do: default_for_clear()
+  # Clear semantics (explicit per key)
+  defp merge_value(key, _left, @clear, _policy) do
+    case key do
+      :tools -> []
+      :stop_list -> []
+      _ -> nil
+    end
+  end
+
+  # "nil override" means "do not change"
   defp merge_value(_key, left, right, _policy) when right == nil, do: left
 
-  # both maps => recurse (deep merge)
+  # maps: deep merge
   defp merge_value(_key, left, right, policy) when is_map(left) and is_map(right) do
     deep_merge(left, right, policy)
   end
 
-  # lists => apply per-key policy
+  # lists: policy-based merge
   defp merge_value(key, left, right, policy) when is_list(left) and is_list(right) do
+    list_policy = Map.get(policy, key, :replace)
+    merge_list_by_policy(list_policy, left, right)
+  end
+
+  defp merge_value(key, left, right, policy) when is_list(right) do
+    list_policy = Map.get(policy, key, :replace)
+    merge_list_by_policy(list_policy, assumed_list(left), right)
+  end
+
+  defp merge_value(key, left, right, policy) when is_list(left) do
     list_policy = Map.get(policy, key, :replace)
     merge_list_by_policy(list_policy, left, assumed_list(right))
   end
 
-  # if profile has nil and override has list (or vice versa)
-  defp merge_value(key, left, right, policy) when is_list(right) do
-    list_policy = Map.get(policy, key, :replace)
-    merge_list_by_policy(list_policy, assumed_list(left), assumed_list(right))
-  end
-
-  # scalar => override
   defp merge_value(_key, _left, right, _policy), do: right
 
-  defp default_for_clear(), do: nil
+
 
   defp assumed_list(nil), do: []
   defp assumed_list(v) when is_list(v), do: v
-  defp assumed_list(_), do: []
+  defp assumed_list(v), do: raise(ArgumentError, "Expected list, got: #{inspect(v)}")
 
   defp merge_list_by_policy(:replace, _left, right), do: right
   defp merge_list_by_policy(:append, left, right), do: left ++ right
-  defp merge_list_by_policy(:union, left, right), do: left ++ right
+  defp merge_list_by_policy(:union, left, right) do
+    (left ++ right) |> Enum.uniq()
+  end
+
   defp merge_list_by_policy(_unknown, _left, right), do: right
 
   # -------------------------
@@ -149,17 +182,20 @@ defmodule AgentCore.Llm.Resolver do
     |> canonicalize_stop_list()
   end
 
-  defp canonicalize_overrides(overrides) when is_map(overrides) do
-    overrides
+  # Accept only map snapshot here (we now pass normalized overrides_map_for_merge)
+  defp canonicalize_overrides(%{} = overrides_map) do
+    overrides_map
     |> canonicalize_stop_list_in_map()
     |> canonicalize_tools_in_map()
   end
 
+  # generation may be map OR struct (e.g. GenerationParams)
   defp canonicalize_generation(m) do
     gen = Map.get(m, :generation) || %{}
 
     gen =
       gen
+      |> normalize_generation_term()
       |> drop_nil_map_values()
       |> normalize_numeric(:temperature, 0.0, 2.0)
       |> normalize_numeric(:top_p, 0.0, 1.0)
@@ -169,17 +205,28 @@ defmodule AgentCore.Llm.Resolver do
     Map.put(m, :generation, gen)
   end
 
+  defp normalize_generation_term(%_struct{} = s), do: Map.from_struct(s)
+  defp normalize_generation_term(%{} = m), do: m
+  defp normalize_generation_term(_), do: %{}
+
+  # budgets may be map OR struct (future-proof)
   defp canonicalize_budgets(m) do
     b = Map.get(m, :budgets) || %{}
 
     b =
       b
+      |> normalize_map_term()
       |> drop_nil_map_values()
       |> normalize_int(:request_timeout_ms, 1_000, 600_000)
       |> normalize_int(:max_retries, 0, 10)
 
     Map.put(m, :budgets, b)
   end
+
+  # NOTE: keep ONLY ONE definition of normalize_map_term/1
+  defp normalize_map_term(%_struct{} = s), do: Map.from_struct(s)
+  defp normalize_map_term(%{} = m), do: m
+  defp normalize_map_term(_), do: %{}
 
   defp canonicalize_tools(m) do
     tools =
@@ -267,11 +314,27 @@ defmodule AgentCore.Llm.Resolver do
 
   defp normalize_tool(_), do: nil
 
-  defp drop_nil_map_values(map) when is_map(map) do
+  # -------------------------
+  # Nil cleanup (struct-safe)
+  # -------------------------
+
+  defp drop_nil_map_values(%_struct{} = s) do
+    s
+    |> Map.from_struct()
+    |> drop_nil_map_values()
+  end
+
+  defp drop_nil_map_values(%{} = map) do
     map
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Map.new()
   end
+
+
+
+  # -------------------------
+  # Normalizers
+  # -------------------------
 
   defp normalize_numeric(map, key, min, max) do
     case Map.fetch(map, key) do
@@ -322,7 +385,6 @@ defmodule AgentCore.Llm.Resolver do
   # -------------------------
 
   defp fingerprint(resolved_map) do
-    # We want a stable hash; create a canonical term
     canonical =
       resolved_map
       |> Map.take([:profile_id, :provider, :model, :generation, :budgets, :tools, :stop_list])

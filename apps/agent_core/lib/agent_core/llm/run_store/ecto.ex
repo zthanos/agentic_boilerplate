@@ -5,19 +5,20 @@ defmodule AgentCore.Llm.RunStore.Ecto do
 
   alias AgentCore.Repo
   alias AgentCore.Llm.{RunSnapshot, RunRecord}
+  alias AgentCore.RunStore.Serialization
 
   @impl true
     def put(%RunSnapshot{} = snap) do
     overrides =
       snap.overrides
       |> Kernel.||(%{})
-      |> deep_jsonify()
+      |> Serialization.deep_jsonify()
       # |> deep_sort()  # optional
 
     invocation_config =
       snap.invocation_config
       |> Kernel.||(%{})
-      |> deep_jsonify()
+      |> Serialization.deep_jsonify()
       # |> deep_sort()  # optional
 
     attrs = %{
@@ -83,27 +84,6 @@ defmodule AgentCore.Llm.RunStore.Ecto do
       invocation_config: rec.invocation_config
     }
   end
-
-  # defp deep_stringify_keys(term) do
-  #   cond do
-  #     is_struct(term) ->
-  #       term
-  #       |> Map.from_struct()
-  #       |> deep_stringify_keys()
-
-  #     is_map(term) ->
-  #       term
-  #       |> Enum.map(fn {k, v} -> {to_string(k), deep_stringify_keys(v)} end)
-  #       |> Map.new()
-
-  #     is_list(term) ->
-  #       Enum.map(term, &deep_stringify_keys/1)
-
-  #     true ->
-  #       term
-  #   end
-  # end
-
 
   def mark_started(fingerprint) when is_binary(fingerprint) do
     now = DateTime.utc_now()
@@ -212,45 +192,6 @@ defmodule AgentCore.Llm.RunStore.Ecto do
     %{type: "error", value: inspect(other)}
   end
 
-# Converts a term into a JSON-safe structure:
-# - map keys -> strings
-# - atoms -> strings
-# - DateTime -> ISO8601 string
-# - tuples -> lists
-# - structs -> map (from_struct) then recurse (except DateTime)
-defp deep_jsonify(term) do
-  cond do
-    is_nil(term) or is_boolean(term) or is_number(term) or is_binary(term) ->
-      term
 
-    is_atom(term) ->
-      Atom.to_string(term)
-
-    is_struct(term, DateTime) ->
-      DateTime.to_iso8601(term)
-
-    is_struct(term) ->
-      term
-      |> Map.from_struct()
-      |> deep_jsonify()
-
-    is_map(term) ->
-      term
-      |> Enum.map(fn {k, v} -> {to_string(k), deep_jsonify(v)} end)
-      |> Map.new()
-
-    is_list(term) ->
-      Enum.map(term, &deep_jsonify/1)
-
-    is_tuple(term) ->
-      term
-      |> Tuple.to_list()
-      |> deep_jsonify()
-
-    true ->
-      # Fallback: stringify anything else (pids, refs, functions, etc.)
-      inspect(term)
-  end
-end
 
 end

@@ -55,8 +55,50 @@ defmodule AgentCore.RunStore.Serialization do
         sorted
     end
   end
-
   def deep_sort(value), do: value
+
+  # Converts a term into a JSON-safe structure:
+  # - map keys -> strings
+  # - atoms -> strings
+  # - DateTime -> ISO8601 string
+  # - tuples -> lists
+  # - structs -> map (from_struct) then recurse (except DateTime)
+  def deep_jsonify(term) do
+    cond do
+      is_nil(term) or is_boolean(term) or is_number(term) or is_binary(term) ->
+        term
+
+      is_atom(term) ->
+        Atom.to_string(term)
+
+      is_struct(term, DateTime) ->
+        DateTime.to_iso8601(term)
+
+      is_struct(term) ->
+        term
+        |> Map.from_struct()
+        |> deep_jsonify()
+
+      is_map(term) ->
+        term
+        |> Enum.map(fn {k, v} -> {to_string(k), deep_jsonify(v)} end)
+        |> Map.new()
+
+      is_list(term) ->
+        Enum.map(term, &deep_jsonify/1)
+
+      is_tuple(term) ->
+        term
+        |> Tuple.to_list()
+        |> deep_jsonify()
+
+      true ->
+        # Fallback: stringify anything else (pids, refs, functions, etc.)
+        inspect(term)
+    end
+  end
+
+
 
   defp is_scalar(v) when is_binary(v) or is_number(v) or is_boolean(v) or is_nil(v), do: true
   defp is_scalar(_), do: false
