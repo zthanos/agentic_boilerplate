@@ -15,6 +15,8 @@ defmodule AgentRuntime.Llm.Client do
     ProviderRequest
     # ProviderAdapter
   }
+  alias AgentRuntime.Llm.ProviderRouter
+
 
   @type chat_message :: map()
   @type overrides :: map()
@@ -64,10 +66,14 @@ defmodule AgentRuntime.Llm.Client do
   # Routing
   # -------------------------
 
-  defp route(:fake), do: {:ok, AgentCore.Llm.Providers.FakeProvider}
+  defp route(provider) do
+    ProviderRouter.route(provider)
+  end
 
-  defp route(provider),
-    do: {:error, {:unsupported_provider, provider}}
+  # defp route(:fake), do: {:ok, AgentCore.Llm.Providers.FakeProvider}
+
+  # defp route(provider),
+  #   do: {:error, {:unsupported_provider, provider}}
 
   # -------------------------
   # Validation

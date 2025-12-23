@@ -49,4 +49,17 @@ defmodule AgentRuntime.Llm.ExecutorTest do
     assert resp.output_text == "FAKE: hello"
   end
 
+  test "router ignores invalid overrides and falls back to default" do
+    prev = Application.get_env(:agent_runtime, AgentRuntime.Llm.ProviderRouter, [])
+
+    Application.put_env(:agent_runtime, AgentRuntime.Llm.ProviderRouter, overrides: %{fake: nil})
+
+    assert {:ok, mod} = AgentRuntime.Llm.ProviderRouter.route(:fake)
+    assert mod == AgentCore.Llm.Providers.FakeProvider
+
+    on_exit(fn ->
+      Application.put_env(:agent_runtime, AgentRuntime.Llm.ProviderRouter, prev)
+    end)
+  end
+
 end

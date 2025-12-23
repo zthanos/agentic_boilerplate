@@ -14,6 +14,8 @@ defmodule AgentCore.Llm.ProfileStoreEctoTest do
     # Here we keep async: false, but leaving this doesn't hurt.
     Sandbox.mode(Repo, {:shared, self()})
 
+    Repo.delete_all("llm_profiles")
+
     :ok
   end
 
