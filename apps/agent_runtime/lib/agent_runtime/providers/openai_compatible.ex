@@ -11,18 +11,22 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   @behaviour AgentCore.Llm.ProviderAdapter
 
   alias AgentCore.Llm.{ProviderRequest, ProviderResponse}
-  alias AgentRuntime.Llm.ConnectionResolver
+  alias AgentRuntime.Llm.ModelResolver
 
-  @chat_path "/v1/chat/completions"
-  @completion_path "/v1/completions"
+
+
+  @chat_path "/chat/completions"
+  @completion_path "/completions"
+  alias AgentRuntime.Llm.ProviderConfig
 
   @impl true
   def call(%ProviderRequest{} = req) do
-    conn = ConnectionResolver.openai_compatible()
+    cfg = ProviderConfig.openai_compatible()
 
     with {:ok, {path, payload}} <- build_request(req),
          {:ok, body} <- json_encode(payload),
-         {:ok, %{} = resp_map} <- http_post(conn.base_url <> path, body, conn.api_key, conn.timeout_ms),
+         {:ok, %{} = resp_map} <-
+           http_post(cfg.base_url <> path, body, cfg.api_key, cfg.timeout_ms, cfg.connect_timeout_ms),
          {:ok, provider_resp} <- parse_response(req, resp_map) do
       {:ok, provider_resp}
     end
@@ -33,10 +37,12 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   # -------------------------
 
   defp build_request(%ProviderRequest{invocation: inv, input: %{type: :chat, messages: msgs}}) do
+    provider = Map.get(inv, :provider, :openai_compatible)
+
     {:ok,
      {@chat_path,
       %{
-        "model" => to_string(inv.model),
+        "model" => ModelResolver.resolve(provider, inv.model),
         "messages" => Enum.map(msgs || [], &normalize_chat_message/1),
         "temperature" => get_in(inv.generation || %{}, [:temperature]),
         "top_p" => get_in(inv.generation || %{}, [:top_p]),
@@ -45,11 +51,12 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
       |> drop_nil_values()}}
   end
 
+
   defp build_request(%ProviderRequest{invocation: inv, input: %{type: :completion, prompt: prompt}}) do
     {:ok,
      {@completion_path,
       %{
-        "model" => to_string(inv.model),
+        "model" => ModelResolver.resolve(inv.provider, inv.model),
         "prompt" => prompt,
         "temperature" => get_in(inv.generation || %{}, [:temperature]),
         "top_p" => get_in(inv.generation || %{}, [:top_p]),
@@ -82,21 +89,23 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   # -------------------------
   # HTTP (no extra deps)
   # -------------------------
-
-  defp http_post(url, body, api_key, timeout_ms) do
+  defp http_post(url, body, api_key, timeout_ms, connect_timeout_ms) do
     headers =
       [{~c"content-type", ~c"application/json"}]
       |> maybe_auth(api_key)
 
     http_opts = [
       timeout: timeout_ms,
-      connect_timeout: min(10_000, timeout_ms)
+      connect_timeout: connect_timeout_ms
     ]
 
-    request = {to_charlist(url), headers, ~c"application/json", to_charlist(body)}
-
-
-    case :httpc.request(:post, request, http_opts, body_format: :binary) do
+    case http_client().post(
+           to_charlist(url),
+           headers,
+           to_charlist(body),
+           http_opts,
+           [body_format: :binary]
+         ) do
       {:ok, {{_http, status, _reason}, _resp_headers, resp_body}} when status in 200..299 ->
         json_decode(resp_body)
 
@@ -108,9 +117,15 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
     end
   end
 
+  defp http_client do
+    Application.get_env(:agent_runtime, :llm_http_client, AgentRuntime.Llm.HttpClient.Default)
+  end
+
   defp maybe_auth(headers, nil), do: headers
   defp maybe_auth(headers, ""), do: headers
-  defp maybe_auth(headers, api_key), do: [{~c"authorization", to_charlist("Bearer " <> api_key)} | headers]
+  defp maybe_auth(headers, api_key),
+    do: [{~c"authorization", to_charlist("Bearer " <> api_key)} | headers]
+
 
 
   defp json_encode(map) do
