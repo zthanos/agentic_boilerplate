@@ -1,4 +1,4 @@
-defmodule AgentCore.Repo.Migrations.CreateLlmRuns do
+defmodule AgentWeb.Repo.Migrations.CreateLlmRuns do
   use Ecto.Migration
 
   def change do

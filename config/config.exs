@@ -16,9 +16,26 @@
 # General application configuration
 import Config
 
-config :agent_core, AgentCore.Llm.Runs,
-  store: AgentCore.Llm.RunStore.Ecto
+# -----------------------------------------------------------------------------
+# Core (domain) wiring: façades select store implementation via config
+# -----------------------------------------------------------------------------
 
+config :agent_core, AgentCore.Llm.Profiles,
+  store: AgentWeb.Llm.ProfileStoreEcto
+
+config :agent_core, AgentCore.Llm.Runs,
+  store: AgentWeb.Llm.RunStoreEcto
+
+# -----------------------------------------------------------------------------
+# Runtime defaults (can be overridden per env)
+# -----------------------------------------------------------------------------
+
+config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
+  openai_compatible: [
+    base_url: "http://localhost:1234/v1",
+    timeout_ms: 60_000,
+    connect_timeout_ms: 10_000
+  ]
 
 config :agent_web,
   ecto_repos: [AgentWeb.Repo],

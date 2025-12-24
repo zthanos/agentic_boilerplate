@@ -92,4 +92,30 @@ if config_env() == :prod do
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
+
+  #http://localhost:1234/v1
+
+
+  # -----------------------------------------------------------------------------
+  # agent_web Repo (SQLite) runtime path
+  # -----------------------------------------------------------------------------
+
+  db_path = System.get_env("SQLITE_PATH") || "/data/agent_web.sqlite3"
+
+  config :agent_web, AgentWeb.Repo,
+    database: db_path,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+
+  # -----------------------------------------------------------------------------
+  # Provider runtime env (OpenAI-compatible)
+  # -----------------------------------------------------------------------------
+
+  config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
+    openai_compatible: [
+      base_url: System.get_env("OPENAI_BASE_URL") || "http://localhost:1234/v1",
+      api_key: System.get_env("OPENAI_API_KEY") || "",
+      timeout_ms: String.to_integer(System.get_env("OPENAI_TIMEOUT_MS") || "60000"),
+      connect_timeout_ms: String.to_integer(System.get_env("OPENAI_CONNECT_TIMEOUT_MS") || "10000")
+    ]
+
 end

@@ -1,4 +1,4 @@
-defmodule AgentCore.Llm.RunRecord do
+defmodule AgentWeb.Schemas.RunRecord do
   use Ecto.Schema
   import Ecto.Changeset
 

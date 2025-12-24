@@ -1,4 +1,4 @@
-defmodule AgentCore.Llm.ProfileRecord do
+defmodule AgentWeb.Schemas.ProfileRecord do
   use Ecto.Schema
   import Ecto.Changeset
 

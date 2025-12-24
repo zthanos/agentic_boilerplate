@@ -1,2 +1,2 @@
-config :agent_runtime, AgentRuntime.Llm.RunStore,
-  impl: AgentCore.Llm.RunStore.Ecto
+# apps/agent_runtime/config/test.exs
+config :agent_runtime, :run_store, AgentRuntime.Llm.RunStore.Memory

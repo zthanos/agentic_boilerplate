@@ -1,8 +1,7 @@
 defmodule AgentRuntime.Llm.Executor do
   @moduledoc false
 
-  alias AgentCore.Llm.{ProviderRequest, Resolver, RunSnapshots}
-  alias AgentCore.Llm.RunStore.Ecto, as: RunStore
+  alias AgentCore.Llm.{ProviderRequest, Resolver, RunSnapshots, Runs}
   alias AgentRuntime.Llm.{ModelResolver, ProviderRegistry}
 
   def execute(profile, overrides, input) do
@@ -11,8 +10,8 @@ defmodule AgentRuntime.Llm.Executor do
     invocation = Resolver.resolve(profile, overrides)
 
     snapshot = RunSnapshots.from_config(invocation, invocation.overrides)
-    _ = RunStore.put(snapshot)
-    _ = RunStore.mark_started(snapshot.fingerprint)
+    _ = Runs.put(snapshot)
+    _ = Runs.mark_started(snapshot.fingerprint)
 
     resolved_model = ModelResolver.resolve(invocation.provider, invocation.model)
 
@@ -37,7 +36,7 @@ defmodule AgentRuntime.Llm.Executor do
       latency = System.monotonic_time(:millisecond) - started_at
 
       _ =
-        RunStore.mark_finished(snapshot.fingerprint, %{
+        Runs.mark_finished(snapshot.fingerprint, %{
           usage: resp.usage,
           latency_ms: latency
         })
@@ -59,7 +58,7 @@ defmodule AgentRuntime.Llm.Executor do
       {:error, reason} ->
         latency = System.monotonic_time(:millisecond) - started_at
 
-        _ = RunStore.mark_failed(snapshot.fingerprint, reason, %{latency_ms: latency})
+        _ = Runs.mark_failed(snapshot.fingerprint, reason, %{latency_ms: latency})
 
         :telemetry.execute(
           [:agent_runtime, :llm, :execute, :error],

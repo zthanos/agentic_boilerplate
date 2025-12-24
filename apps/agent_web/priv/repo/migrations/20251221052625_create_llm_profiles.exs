@@ -1,4 +1,4 @@
-defmodule AgentCore.Repo.Migrations.CreateLlmProfiles do
+defmodule AgentWeb.Repo.Migrations.CreateLlmProfiles do
   use Ecto.Migration
 
   def change do

@@ -1,4 +1,4 @@
-defmodule AgentCore.Repo.Migrations.AddRunLifecycleFields do
+defmodule AgentWeb.Repo.Migrations.AddRunLifecycleFields do
   use Ecto.Migration
 
   def change do

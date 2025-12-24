@@ -23,6 +23,7 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   def call(%ProviderRequest{} = req) do
     cfg = ProviderConfig.openai_compatible()
 
+
     with {:ok, {path, payload}} <- build_request(req),
          {:ok, body} <- json_encode(payload),
          {:ok, %{} = resp_map} <-

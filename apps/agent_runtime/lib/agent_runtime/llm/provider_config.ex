@@ -8,7 +8,7 @@ defmodule AgentRuntime.Llm.ProviderConfig do
           connect_timeout_ms: pos_integer()
         }
 
-  @default_base_url "http://host.docker.internal:1234/v1"
+  @default_base_url "http://localhost:1234/v1"
   @default_timeout_ms 60_000
   @default_connect_timeout_ms 10_000
 
