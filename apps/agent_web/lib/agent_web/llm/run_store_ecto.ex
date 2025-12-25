@@ -9,6 +9,8 @@ defmodule AgentWeb.Llm.RunStoreEcto do
   alias AgentWeb.Repo
   alias AgentWeb.Schemas.RunRecord
   alias AgentWeb.Support.Serialization
+  alias AgentCore.Llm.RunView
+
 
   # -----------------------
   # Public API (RunStore)
@@ -56,7 +58,7 @@ defmodule AgentWeb.Llm.RunStoreEcto do
   def get(run_id) when is_binary(run_id) do
     case Repo.get(RunRecord, run_id) do
       nil -> {:error, :not_found}
-      rec -> {:ok, to_snapshot(rec)}
+      rec -> {:ok, to_view(rec)}
     end
   end
 
@@ -106,7 +108,7 @@ defmodule AgentWeb.Llm.RunStoreEcto do
     runs =
       query
       |> Repo.all()
-      |> Enum.map(&to_snapshot/1)
+      |> Enum.map(&to_view/1)
 
     {:ok, runs}
   end
@@ -259,4 +261,39 @@ defmodule AgentWeb.Llm.RunStoreEcto do
   defp normalize_error(%{__struct__: _} = struct), do: %{type: "error", value: inspect(struct)}
   defp normalize_error({type, value}), do: %{type: inspect(type), value: inspect(value)}
   defp normalize_error(other), do: %{type: "error", value: inspect(other)}
+
+
+  defp to_view(%RunRecord{} = r) do
+    %RunView{
+      # identity / chaining
+      run_id: r.run_id,
+      trace_id: r.trace_id,
+      parent_run_id: r.parent_run_id,
+      phase: r.phase,
+
+      # snapshot
+      fingerprint: r.fingerprint,
+      profile_id: r.profile_id,
+      profile_name: r.profile_name,
+      provider: r.provider,
+      model: r.model,
+      policy_version: r.policy_version,
+      resolved_at: r.resolved_at,
+      overrides: r.overrides || %{},
+      invocation_config: r.invocation_config || %{},
+
+      # lifecycle
+      status: r.status,
+      started_at: r.started_at,
+      finished_at: r.finished_at,
+      latency_ms: r.latency_ms,
+      usage: r.usage,
+      error: r.error,
+
+      # audit
+      inserted_at: r.inserted_at,
+      updated_at: r.updated_at
+    }
+  end
+
 end

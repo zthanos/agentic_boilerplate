@@ -114,7 +114,7 @@ if config_env() == :prod do
     openai_compatible: [
       base_url: System.get_env("OPENAI_BASE_URL") || "http://localhost:1234/v1",
       api_key: System.get_env("OPENAI_API_KEY") || "",
-      timeout_ms: String.to_integer(System.get_env("OPENAI_TIMEOUT_MS") || "60000"),
+      timeout_ms: String.to_integer(System.get_env("OPENAI_TIMEOUT_MS") || "90000"),
       connect_timeout_ms: String.to_integer(System.get_env("OPENAI_CONNECT_TIMEOUT_MS") || "10000")
     ]
 

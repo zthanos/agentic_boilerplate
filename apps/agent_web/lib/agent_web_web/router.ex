@@ -19,6 +19,9 @@ defmodule AgentWebWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/runs", RunHistoryLive, :index
+    live "/chat", ChatExecuteLive, :index
+
   end
 
   scope "/api" do

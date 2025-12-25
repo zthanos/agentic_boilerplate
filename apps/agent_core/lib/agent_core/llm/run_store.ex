@@ -3,7 +3,7 @@ defmodule AgentCore.Llm.RunStore do
   Storage abstraction for LLM Runs.
   """
 
-  alias AgentCore.Llm.RunSnapshot
+  alias AgentCore.Llm.{RunSnapshot, RunView}
 
   @type error :: term()
   @type outcome :: map()
@@ -11,12 +11,11 @@ defmodule AgentCore.Llm.RunStore do
   @type run_id :: Ecto.UUID.t()
   @type trace_id :: Ecto.UUID.t()
 
-  @callback put(RunSnapshot.t()) :: {:ok, run_id()} | {:error, error()}
-  @callback get(run_id()) :: {:ok, RunSnapshot.t()} | {:error, :not_found} | {:error, error()}
 
-  # Query surface: keep it as list/1 with filters to avoid API sprawl
-  # Supported filters: trace_id, fingerprint, profile_id, status, limit, order
-  @callback list(keyword()) :: {:ok, [RunSnapshot.t()]} | {:error, error()}
+  @callback put(RunSnapshot.t()) :: {:ok, run_id()} | {:error, error()}
+  @callback get(run_id()) :: {:ok, RunView.t()} | {:error, :not_found}
+  @callback list(keyword()) :: {:ok, [RunView.t()]} | {:error, error()}
+
 
   # Lifecycle
   @callback mark_started(run_id()) :: {:ok, run_id()} | {:error, :not_found} | {:error, error()}

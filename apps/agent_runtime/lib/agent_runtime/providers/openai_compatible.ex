@@ -92,7 +92,8 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   # -------------------------
   defp http_post(url, body, api_key, timeout_ms, connect_timeout_ms) do
     headers =
-      [{~c"content-type", ~c"application/json"}]
+      [{~c"content-type", ~c"application/json"},
+      {~c"connection", ~c"close"}]
       |> maybe_auth(api_key)
 
     http_opts = [

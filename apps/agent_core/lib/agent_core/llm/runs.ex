@@ -3,6 +3,7 @@ defmodule AgentCore.Llm.Runs do
 
   alias AgentCore.Llm.RunSnapshot
   alias AgentCore.Llm.RunStore
+  alias AgentCore.Llm.RunView
 
   defp store do
     Application.fetch_env!(:agent_core, __MODULE__)
@@ -17,13 +18,11 @@ defmodule AgentCore.Llm.Runs do
     store().put(snap)
   end
 
-  @spec get(run_id()) :: {:ok, RunSnapshot.t()} | {:error, :not_found} | {:error, term()}
-  def get(run_id) when is_binary(run_id) do
-    store().get(run_id)
-  end
+  @spec get(String.t()) :: {:ok, RunView.t()} | {:error, :not_found} | {:error, term()}
+  def get(run_id) when is_binary(run_id), do: store().get(run_id)
 
-  @spec list(keyword()) :: {:ok, [RunSnapshot.t()]} | {:error, term()}
-  def list(opts \\ []) when is_list(opts), do: store().list(opts)
+  @spec list(keyword()) :: {:ok, [RunView.t()]} | {:error, term()}
+  def list(opts \\ []), do: store().list(opts)
 
   @doc """
   Convenience helper: latest run for a given fingerprint (configuration).
