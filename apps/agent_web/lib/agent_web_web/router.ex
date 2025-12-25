@@ -12,6 +12,7 @@ defmodule AgentWebWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug OpenApiSpex.Plug.PutApiSpec, module: AgentWeb.OpenApi
   end
 
   scope "/", AgentWebWeb do
@@ -20,12 +21,21 @@ defmodule AgentWebWeb.Router do
     get "/", PageController, :home
   end
 
+  scope "/api" do
+    pipe_through :api
+
+    get "/openapi", OpenApiSpex.Plug.RenderSpec, :show
+
+    get "/swaggerui", OpenApiSpex.Plug.SwaggerUI,
+      path: "/api/openapi",
+      default_model_expand_depth: 3
+  end
+
   scope "/api", AgentWebWeb do
     pipe_through :api
 
-    get  "/runs", RunController, :index
-    get  "/runs/:run_id", RunController, :show
-
+    get "/runs", RunController, :index
+    get "/runs/:run_id", RunController, :show
     post "/llm/execute", LlmExecuteController, :execute
   end
 

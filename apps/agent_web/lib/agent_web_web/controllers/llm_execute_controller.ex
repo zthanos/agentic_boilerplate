@@ -1,5 +1,7 @@
 defmodule AgentWebWeb.LlmExecuteController do
   use AgentWebWeb, :controller
+  use OpenApiSpex.ControllerSpecs
+  alias AgentWeb.OpenApi.Schemas
 
   alias AgentRuntime.Llm.Executor
   alias AgentCore.Llm.Profiles
@@ -18,6 +20,18 @@ defmodule AgentWebWeb.LlmExecuteController do
     "phase": "draft|critique|revise|final" // optional
   }
   """
+
+  operation :execute,
+    summary: "Execute an LLM call",
+    request_body: {"Execute request", "application/json", Schemas.LlmExecuteRequest},
+    responses: [
+      ok: {"OK", "application/json", Schemas.LlmExecuteResponseOk},
+      bad_request: {"Bad Request", "application/json", Schemas.LlmExecuteResponseError},
+      not_found: {"Not Found", "application/json", Schemas.LlmExecuteResponseError},
+      internal_server_error: {"Internal Server Error", "application/json", Schemas.LlmExecuteResponseError}
+    ]
+
+
   def execute(conn, %{"profile_id" => profile_id, "input" => input} = params) do
     overrides = Map.get(params, "overrides", %{})
 
@@ -77,7 +91,10 @@ defmodule AgentWebWeb.LlmExecuteController do
     e ->
       conn
       |> put_status(:internal_server_error)
-      |> json(%{"status" => "error", "error" => Exception.message(e)})
+      |> json(%{
+        "status" => "error",
+        "error" => %{"message" => Exception.message(e)}
+      })
   end
 
   def execute(conn, _params) do
