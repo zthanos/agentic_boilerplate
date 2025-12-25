@@ -1,6 +1,20 @@
 defmodule AgentCore.Llm.RunSnapshot do
-  @enforce_keys [:fingerprint, :profile_id, :provider, :model, :policy_version, :resolved_at, :invocation_config]
+  @enforce_keys [
+    :run_id,
+    :trace_id,
+    :fingerprint,
+    :profile_id,
+    :provider,
+    :model,
+    :policy_version,
+    :resolved_at,
+    :invocation_config
+  ]
   defstruct [
+    :run_id,
+    :trace_id,
+    :parent_run_id,
+    :phase,
     :fingerprint,
     :profile_id,
     :profile_name,
@@ -13,6 +27,10 @@ defmodule AgentCore.Llm.RunSnapshot do
   ]
 
   @type t :: %__MODULE__{
+          run_id: String.t(),
+          trace_id: String.t(),
+          parent_run_id: String.t() | nil,
+          phase: String.t() | nil,
           fingerprint: String.t(),
           profile_id: String.t() | integer(),
           profile_name: String.t() | nil,

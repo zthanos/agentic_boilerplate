@@ -5,9 +5,13 @@ defmodule AgentRuntime.Llm.Runs do
   agent_web should call agent_runtime (not agent_core) to keep dependency direction clean.
   """
 
-  alias AgentCore.Llm.Runs
+  alias AgentCore.Llm.RunSnapshot
+  alias AgentCore.Llm.Runs, as: CoreRuns
 
-  def list(opts \\ []) when is_list(opts), do: Runs.list(opts)
+  @spec list(keyword()) :: {:ok, [RunSnapshot.t()]} | {:error, term()}
+  def list(opts \\ []) when is_list(opts), do: CoreRuns.list(opts)
 
-  def get_by_fingerprint(fp) when is_binary(fp), do: Runs.get_by_fingerprint(fp)
+  @spec get(String.t()) :: {:ok, RunSnapshot.t()} | {:error, :not_found} | {:error, term()}
+  def get(run_id) when is_binary(run_id), do: CoreRuns.get(run_id)
+
 end

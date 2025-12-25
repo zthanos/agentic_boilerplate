@@ -23,9 +23,14 @@ defmodule AgentWebWeb.Router do
   scope "/api", AgentWebWeb do
     pipe_through :api
 
-    get "/runs", RunController, :index
-    get "/runs/:fingerprint", RunController, :show
+    get  "/runs", RunController, :index
+    get  "/runs/:run_id", RunController, :show
+
+    post "/llm/execute", LlmExecuteController, :execute
   end
+
+
+
 
 
   # Other scopes may use custom stacks.
