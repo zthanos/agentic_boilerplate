@@ -26,3 +26,14 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+
+config :agent_core, AgentCore.Repo,
+  database: "data/agent_core_test.sqlite3",
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: 5
+
+config :agent_core, AgentCore.Llm.Runs,
+  store: AgentCore.Llm.RunStore.Ecto
+
+config :agent_core, AgentCore.Llm.ProviderRouter,
+  openai: AgentCore.Llm.Providers.FakeProvider

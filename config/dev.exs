@@ -1,9 +1,12 @@
 import Config
 
-# Configure your database
+# -----------------------------------------------------------------------------
+# agent_web Repo (SQLite)
+# -----------------------------------------------------------------------------
+
 config :agent_web, AgentWeb.Repo,
-  database: Path.expand("../agent_web_dev.db", __DIR__),
-  pool_size: 5,
+  database: Path.expand("../apps/agent_web/priv/dev.sqlite3", __DIR__),
+  pool_size: 10,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 
