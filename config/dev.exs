@@ -4,11 +4,7 @@ import Config
 # agent_web Repo (SQLite)
 # -----------------------------------------------------------------------------
 
-config :agent_web, AgentWeb.Repo,
-  database: Path.expand("../apps/agent_web/priv/dev.sqlite3", __DIR__),
-  pool_size: 10,
-  stacktrace: true,
-  show_sensitive_data_on_connection_error: true
+
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

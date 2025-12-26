@@ -2,7 +2,7 @@ defmodule AgentWeb.Repo.Migrations.RebuildLlmRunsAddRunIdAndCorrelationId do
   use Ecto.Migration
 
   def up do
-    # 1) new table
+    # 1) create new table with correct structure
     create table(:llm_runs_v2, primary_key: false) do
       add :run_id, :binary_id, primary_key: true
       add :trace_id, :binary_id, null: false
@@ -20,7 +20,6 @@ defmodule AgentWeb.Repo.Migrations.RebuildLlmRunsAddRunIdAndCorrelationId do
       add :overrides, :map, null: false, default: %{}
       add :invocation_config, :map, null: false, default: %{}
 
-      # existing runtime columns (από το RunRecord σου)
       add :status, :string
       add :started_at, :utc_datetime_usec
       add :finished_at, :utc_datetime_usec
@@ -38,35 +37,14 @@ defmodule AgentWeb.Repo.Migrations.RebuildLlmRunsAddRunIdAndCorrelationId do
     create index(:llm_runs_v2, [:trace_id, :inserted_at])
     create index(:llm_runs_v2, [:parent_run_id])
 
-    # 2) copy old data -> v2
-    # Για υπάρχοντα rows: trace_id = run_id (ώστε να είναι valid)
-    # SQLite uuid: randomblob(16) hex. Για :binary_id σε Ecto/SQLite, αποθηκεύεται ως string.
-    execute("""
-    INSERT INTO llm_runs_v2 (
-      run_id, trace_id, parent_run_id, phase,
-      fingerprint, profile_id, profile_name, provider, model, policy_version, resolved_at,
-      overrides, invocation_config,
-      status, started_at, finished_at, error, usage, latency_ms,
-      inserted_at, updated_at
-    )
-    SELECT
-      lower(hex(randomblob(16))) as run_id,
-      lower(hex(randomblob(16))) as trace_id,
-      NULL as parent_run_id,
-      NULL as phase,
-      fingerprint, profile_id, profile_name, provider, model, policy_version, resolved_at,
-      overrides, invocation_config,
-      status, started_at, finished_at, error, usage, latency_ms,
-      inserted_at, updated_at
-    FROM llm_runs
-    """)
-
-    # 3) swap
+    # 2) drop old table (no data migration)
     drop table(:llm_runs)
+
+    # 3) rename v2 → llm_runs
     rename table(:llm_runs_v2), to: table(:llm_runs)
   end
 
   def down do
-    raise "Irreversible migration (llm_runs rebuilt)."
+    raise "Irreversible migration (llm_runs rebuilt without data migration)."
   end
 end

@@ -136,61 +136,61 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   defp build_stream_request(%ProviderRequest{input: other}),
     do: {:error, {:unsupported_stream_input, other}}
 
-    defp http_post_stream(url, body, api_key, timeout_ms, on_chunk) do
-      headers =
-        [
-          {"content-type", "application/json"},
-          {"accept", "text/event-stream"}
-        ]
-        |> maybe_auth(api_key)
+  defp http_post_stream(url, body, api_key, timeout_ms, on_chunk) do
+    headers =
+      [
+        {"content-type", "application/json"},
+        {"accept", "text/event-stream"}
+      ]
+      |> maybe_auth(api_key)
 
-      req = Finch.build(:post, url, headers, body)
+    req = Finch.build(:post, url, headers, body)
 
-      acc0 = %{
-        buf: "",
-        full: "",
-        raw_last: nil,
-        usage: nil,
-        finish_reason: nil
-      }
+    acc0 = %{
+      buf: "",
+      full: "",
+      raw_last: nil,
+      usage: nil,
+      finish_reason: nil
+    }
 
-      fun = fn
-        {:status, status}, acc when status in 200..299 ->
-          acc
+    fun = fn
+      {:status, status}, acc when status in 200..299 ->
+        acc
 
-        {:status, status}, _acc ->
-          throw({:http_error, status})
+      {:status, status}, _acc ->
+        throw({:http_error, status})
 
-        {:headers, _headers}, acc ->
-          acc
+      {:headers, _headers}, acc ->
+        acc
 
-        {:data, chunk}, acc ->
-          chunk_bin = IO.iodata_to_binary(chunk)
-          stream_accumulate(acc, chunk_bin, on_chunk)
-      end
-
-      try do
-        with {:ok, acc} <-
-               Finch.stream(req, AgentRuntimeFinch, acc0, fun, receive_timeout: timeout_ms) do
-          {:ok,
-           %{
-             full_text: acc.full,
-             usage: acc.usage,
-             raw_last: acc.raw_last,
-             finish_reason: acc.finish_reason
-           }}
-        end
-      catch
-        {:http_error, status} ->
-          {:error, {:http_error, status}}
-
-        {:stream_parse_error, reason} ->
-          {:error, {:stream_parse_error, reason}}
-
-        other ->
-          {:error, other}
-      end
+      {:data, chunk}, acc ->
+        chunk_bin = IO.iodata_to_binary(chunk)
+        stream_accumulate(acc, chunk_bin, on_chunk)
     end
+
+    try do
+      with {:ok, acc} <-
+             Finch.stream(req, AgentRuntimeFinch, acc0, fun, receive_timeout: timeout_ms) do
+        {:ok,
+         %{
+           full_text: acc.full,
+           usage: acc.usage,
+           raw_last: acc.raw_last,
+           finish_reason: acc.finish_reason
+         }}
+      end
+    catch
+      {:http_error, status} ->
+        {:error, {:http_error, status}}
+
+      {:stream_parse_error, reason} ->
+        {:error, {:stream_parse_error, reason}}
+
+      other ->
+        {:error, other}
+    end
+  end
 
   defp stream_accumulate(acc, chunk, on_chunk) do
     buf = acc.buf <> chunk
@@ -333,6 +333,7 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
 
   defp maybe_auth(headers, nil), do: headers
   defp maybe_auth(headers, ""), do: headers
+
   defp maybe_auth(headers, api_key),
     do: [{"authorization", "Bearer " <> api_key} | headers]
 

@@ -8,26 +8,30 @@ services:
     ports:
       - "4080:4000"
     extra_hosts:
-      - "localhost:host-gateway"     
+      - "localhost:host-gateway"
     env_file:
-      - ./.env       
+      - ./.env
     environment:
       MIX_ENV: dev
       PHX_SERVER: "true"
       PHX_BIND_IP: "0.0.0.0"
       PORT: "4000"
-      # Προαιρετικά: για σταθερό locale/encoding σε logs
       LANG: C.UTF-8
+
+      DB_ADAPTER: "postgres"
+      DATABASE_URL: "ecto://postgres:postgres@agentic_boilerplate_db:5432/agent_web_dev"
+
+    depends_on:
+      agentic_boilerplate_db:
+        condition: service_healthy
+
     volumes:
-      # Source code (umbrella)
       - .:/app:cached
-      # Mix/Hex caches για ταχύτητα
       - mix_deps:/app/deps
       - mix_build:/app/_build
       - hex_cache:/root/.hex
       - mix_cache:/root/.mix
-      # Persist SQLite dev DB (agent_web)
-      #- sqlite_data:/app/apps/agent_web/priv/repo
+
     command: >
       sh -lc '
         set -e
@@ -40,13 +44,30 @@ services:
         mix phx.server
       '
 
-    # Αν θες εύκολο shell attach: docker compose exec web sh
     tty: true
     stdin_open: true
+
+  agentic_boilerplate_db:
+    image: pgvector/pgvector:pg16
+    container_name: agentic_boilerplate_postgres
+    environment:
+      POSTGRES_DB: agent_web_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    # Αν θέλεις να συνδέεσαι από host, άλλαξε το αριστερό port (π.χ. 55432)
+    ports:
+      - "15432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agent_web_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   mix_deps:
   mix_build:
   hex_cache:
   mix_cache:
-  # sqlite_data:
+  pg_data:

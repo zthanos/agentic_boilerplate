@@ -1,42 +1,91 @@
 import Config
 
-# config/runtime.exs is executed for all environments, including
-# during releases. It is executed after compilation and before the
-# system starts, so it is typically used to load production configuration
-# and secrets from environment variables or elsewhere. Do not define
-# any compile-time configuration in here, as it won't be applied.
-# The block below contains prod specific runtime configuration.
+# -----------------------------------------------------------------------------
+# Agent Runtime: profile/model routing (runtime-driven)
+# -----------------------------------------------------------------------------
+config :agent_runtime, AgentRuntime.Llm.ProfileSelector,
+  # If nil, resolver must decide (and should record resolution_source)
+  default: System.get_env("DEFAULT_LLM_PROFILE_ID"),
+  mappings: %{
+    # If nil, mapping should be treated as "no mapping"
+    requirements: System.get_env("REQ_LLM_PROFILE_ID")
+  }
 
-# ## Using releases
-#
-# If you use `mix release`, you need to explicitly enable the server
-# by passing the PHX_SERVER=true when you start it:
-#
-#     PHX_SERVER=true bin/agent_web start
-#
-# Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
-# script that automatically sets the env var above.
+config :agent_runtime, AgentRuntime.Llm.ModelResolver,
+  openai_compatible: %{
+    # If nil, alias should be treated as "unknown alias"
+    local: System.get_env("LOCAL_LLM_MODEL"),
+    gpt4mini: System.get_env("GPT4MINI_MODEL")
+  }
+
+# -----------------------------------------------------------------------------
+# Enable Phoenix server in releases
+# -----------------------------------------------------------------------------
 if System.get_env("PHX_SERVER") do
   config :agent_web, AgentWebWeb.Endpoint, server: true
 end
 
+# -----------------------------------------------------------------------------
+# Database config (all envs)
+# -----------------------------------------------------------------------------
+db_adapter = System.get_env("DB_ADAPTER", "postgres")
+
+case db_adapter do
+  "postgres" ->
+    database_url =
+      System.get_env("DATABASE_URL") ||
+        raise """
+        environment variable DATABASE_URL is missing.
+        Example: ecto://postgres:postgres@localhost:5432/agent_web_dev
+        """
+
+    config :agent_web, AgentWeb.Repo,
+      url: database_url,
+      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+
+  "sqlite" ->
+    sqlite_path =
+      System.get_env("SQLITE_PATH") ||
+        raise """
+        environment variable SQLITE_PATH is missing.
+        Example: /data/agent_web.sqlite3
+        """
+
+    config :agent_web, AgentWeb.Repo,
+      database: sqlite_path,
+      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+
+  other ->
+    raise "Unsupported DB_ADAPTER=#{inspect(other)}. Expected 'postgres' or 'sqlite'."
+end
+
+# -----------------------------------------------------------------------------
+# Provider runtime env (OpenAI-compatible) - available in all envs
+# -----------------------------------------------------------------------------
+# Many OpenAI-compatible servers expect /v1 as base. Prefer it in runtime.
+base_url =
+  System.get_env("OPENAI_COMPAT_BASE_URL") ||
+    "http://localhost:1234/v1"
+
+base_url =
+  if String.ends_with?(base_url, "/v1") do
+    base_url
+  else
+    base_url <> "/v1"
+  end
+
+config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
+  openai_compatible: [
+    base_url: base_url,
+    api_key: System.get_env("OPENAI_COMPAT_API_KEY") || "",
+    timeout_ms: String.to_integer(System.get_env("OPENAI_COMPAT_TIMEOUT_MS") || "60000"),
+    connect_timeout_ms: String.to_integer(System.get_env("OPENAI_COMPAT_CONNECT_TIMEOUT_MS") || "10000")
+  ]
+
+# -----------------------------------------------------------------------------
+# Production-only runtime configuration
+# -----------------------------------------------------------------------------
 if config_env() == :prod do
-  database_path =
-    System.get_env("DATABASE_PATH") ||
-      raise """
-      environment variable DATABASE_PATH is missing.
-      For example: /etc/agent_web/agent_web.db
-      """
-
-  config :agent_web, AgentWeb.Repo,
-    database: database_path,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
-
-  # The secret key base is used to sign/encrypt cookies and other secrets.
-  # A default value is used in config/dev.exs and config/test.exs but you
-  # want to use a different value for prod and you most likely don't want
-  # to check this value into version control, so we use an environment
-  # variable instead.
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """
@@ -52,70 +101,8 @@ if config_env() == :prod do
   config :agent_web, AgentWebWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
-      # Enable IPv6 and bind on all interfaces.
-      # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
-      # for details about using IPv6 vs IPv4 and loopback vs public addresses.
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
     secret_key_base: secret_key_base
-
-  # ## SSL Support
-  #
-  # To get SSL working, you will need to add the `https` key
-  # to your endpoint configuration:
-  #
-  #     config :agent_web, AgentWebWeb.Endpoint,
-  #       https: [
-  #         ...,
-  #         port: 443,
-  #         cipher_suite: :strong,
-  #         keyfile: System.get_env("SOME_APP_SSL_KEY_PATH"),
-  #         certfile: System.get_env("SOME_APP_SSL_CERT_PATH")
-  #       ]
-  #
-  # The `cipher_suite` is set to `:strong` to support only the
-  # latest and more secure SSL ciphers. This means old browsers
-  # and clients may not be supported. You can set it to
-  # `:compatible` for wider support.
-  #
-  # `:keyfile` and `:certfile` expect an absolute path to the key
-  # and cert in disk or a relative path inside priv, for example
-  # "priv/ssl/server.key". For all supported SSL configuration
-  # options, see https://hexdocs.pm/plug/Plug.SSL.html#configure/1
-  #
-  # We also recommend setting `force_ssl` in your config/prod.exs,
-  # ensuring no data is ever sent via http, always redirecting to https:
-  #
-  #     config :agent_web, AgentWebWeb.Endpoint,
-  #       force_ssl: [hsts: true]
-  #
-  # Check `Plug.SSL` for all available options in `force_ssl`.
-
-  #http://localhost:1234/v1
-
-
-  # -----------------------------------------------------------------------------
-  # agent_web Repo (SQLite) runtime path
-  # -----------------------------------------------------------------------------
-
-  db_path = System.get_env("SQLITE_PATH") || "/data/agent_web.sqlite3"
-
-  config :agent_web, AgentWeb.Repo,
-    database: db_path,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
-
-  # -----------------------------------------------------------------------------
-  # Provider runtime env (OpenAI-compatible)
-  # -----------------------------------------------------------------------------
-
-  config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
-    openai_compatible: [
-      base_url: System.get_env("OPENAI_BASE_URL") || "http://localhost:1234/v1",
-      api_key: System.get_env("OPENAI_API_KEY") || "",
-      timeout_ms: String.to_integer(System.get_env("OPENAI_TIMEOUT_MS") || "90000"),
-      connect_timeout_ms: String.to_integer(System.get_env("OPENAI_CONNECT_TIMEOUT_MS") || "10000")
-    ]
-
 end

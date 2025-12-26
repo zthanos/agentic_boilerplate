@@ -30,6 +30,8 @@ defmodule AgentWebWeb.LlmExecuteController do
       internal_server_error: {"Internal Server Error", "application/json", Schemas.LlmExecuteResponseError}
     ]
 
+
+
   def execute(conn, %{"profile_id" => profile_id, "input" => input} = params) do
     overrides = Map.get(params, "overrides", %{})
 
@@ -94,6 +96,16 @@ defmodule AgentWebWeb.LlmExecuteController do
         "status" => "error",
         "error" => %{"message" => Exception.message(e)}
       })
+  end
+
+  def execute(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{
+      "status" => "error",
+      "error" => "invalid_request",
+      "details" => "Expected profile_id and input"
+    })
   end
 
   @doc """
@@ -191,15 +203,6 @@ defmodule AgentWebWeb.LlmExecuteController do
       |> json(%{"status" => "error", "error" => %{"message" => Exception.message(e)}})
   end
 
-  def execute(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{
-      "status" => "error",
-      "error" => "invalid_request",
-      "details" => "Expected profile_id and input"
-    })
-  end
 
   # ---- Streaming receive loop (controller owns conn & chunk) ----
 

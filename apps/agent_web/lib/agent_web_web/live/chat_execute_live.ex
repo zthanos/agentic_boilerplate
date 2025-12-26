@@ -5,9 +5,9 @@ defmodule AgentWebWeb.ChatExecuteLive do
 
   # 32-hex trace id
   defp new_trace_id do
-    :crypto.strong_rand_bytes(16)
-    |> Base.encode16(case: :lower)
+    Ecto.UUID.generate()
   end
+
 
   @impl true
   def mount(_params, _session, socket) do
@@ -95,8 +95,24 @@ defmodule AgentWebWeb.ChatExecuteLive do
   end
 
   @impl true
-  def handle_event("sse_done", %{"run_id" => run_id} = meta, socket) do
-    assistant_text = socket.assigns.stream_buffer || ""
+  def handle_event("sse_done", payload, socket) do
+    # Support both shapes:
+    # 1) %{ "meta" => %{...} }  (hook style)
+    # 2) %{ "run_id" => "...", "trace_id" => "...", ... } (flat style)
+    meta =
+      case payload do
+        %{"meta" => m} when is_map(m) -> m
+        m when is_map(m) -> m
+        _ -> %{}
+      end
+
+    run_id = Map.get(meta, "run_id")
+    trace_id = Map.get(meta, "trace_id")
+
+    assistant_text =
+      socket.assigns.stream_buffer
+      |> to_string()
+      |> String.trim()
 
     messages =
       socket.assigns.messages
@@ -107,7 +123,7 @@ defmodule AgentWebWeb.ChatExecuteLive do
       output_text: assistant_text,
       usage: Map.get(meta, "usage"),
       run_id: run_id,
-      trace_id: Map.get(meta, "trace_id"),
+      trace_id: trace_id,
       fingerprint: Map.get(meta, "fingerprint"),
       latency_ms: Map.get(meta, "latency_ms")
     }
@@ -122,12 +138,18 @@ defmodule AgentWebWeb.ChatExecuteLive do
   end
 
   @impl true
-  def handle_event("sse_error", %{"error" => err} = meta, socket) do
+  def handle_event("sse_error", payload, socket) do
+    err =
+      case payload do
+        %{"error" => e} -> e
+        other -> other
+      end
+
     {:noreply,
      socket
      |> assign(:streaming, false)
      |> assign(:loading, false)
-     |> assign(:error, %{message: inspect(err), meta: meta})}
+     |> assign(:error, %{message: inspect(err), meta: payload})}
   end
 
   # --- helpers ---
@@ -267,14 +289,23 @@ defmodule AgentWebWeb.ChatExecuteLive do
                 <div class="p-3 rounded bg-slate-900 border border-slate-700">
                   <div class="text-slate-400">run_id</div>
                   <div class="font-mono break-all">
-                    <a class="underline" href={~p"/api/runs/#{@result.run_id}"} target="_blank"><%= @result.run_id %></a>
+                    <%= if @result.run_id do %>
+                      <a class="underline" href={~p"/api/runs/#{@result.run_id}"} target="_blank"><%= @result.run_id %></a>
+                    <% else %>
+                      <span class="text-slate-500">—</span>
+                    <% end %>
                   </div>
                 </div>
 
                 <div class="p-3 rounded bg-slate-900 border border-slate-700">
                   <div class="text-slate-400">trace_id</div>
                   <div class="font-mono break-all">
-                    <a class="underline" href={~p"/runs?trace_id=#{@result.trace_id}"}><%= @result.trace_id %></a>
+                      <%= if @result.trace_id do %>
+                        <a class="underline" href={~p"/runs?trace_id=#{@result.trace_id}"}><%= @result.trace_id %></a>
+                      <% else %>
+                        <span class="text-slate-500">—</span>
+                      <% end %>
+
                   </div>
                 </div>
 

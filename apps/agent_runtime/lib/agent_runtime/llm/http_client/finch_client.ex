@@ -33,7 +33,7 @@ defmodule AgentRuntime.Llm.HttpClient.FinchClient do
     end
   end
 
-  defp http_post_stream(url, body, api_key, timeout_ms, on_chunk) do
+  def http_post_stream(url, body, api_key, timeout_ms, on_chunk) do
     headers =
       [
         {"content-type", "application/json"},
@@ -56,7 +56,7 @@ defmodule AgentRuntime.Llm.HttpClient.FinchClient do
       {:status, status}, acc when status in 200..299 ->
         acc
 
-      {:status, status}, acc ->
+      {:status, status}, _acc ->
         throw({:http_error, status})
 
       {:headers, _headers}, acc ->

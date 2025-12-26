@@ -53,19 +53,6 @@ defmodule AgentWebWeb.RunHistoryLive do
     apply_filters(socket, params)
   end
 
-  defp apply_filters(socket, params) do
-    filters = %{
-      "trace_id" => Map.get(params, "trace_id", ""),
-      "profile_id" => Map.get(params, "profile_id", ""),
-      "status" => Map.get(params, "status", "")
-    }
-
-    {:noreply,
-     push_patch(socket,
-       to:
-         ~p"/runs?limit=#{socket.assigns.limit}&trace_id=#{filters["trace_id"]}&profile_id=#{filters["profile_id"]}&status=#{filters["status"]}"
-     )}
-  end
 
   @impl true
   def handle_event("set_limit", %{"limit" => limit}, socket) do
@@ -98,6 +85,20 @@ defmodule AgentWebWeb.RunHistoryLive do
       {:error, reason} ->
         assign(socket, runs: [], error: inspect(reason))
     end
+  end
+
+  defp apply_filters(socket, params) do
+    filters = %{
+      "trace_id" => Map.get(params, "trace_id", ""),
+      "profile_id" => Map.get(params, "profile_id", ""),
+      "status" => Map.get(params, "status", "")
+    }
+
+    {:noreply,
+     push_patch(socket,
+       to:
+         ~p"/runs?limit=#{socket.assigns.limit}&trace_id=#{filters["trace_id"]}&profile_id=#{filters["profile_id"]}&status=#{filters["status"]}"
+     )}
   end
 
   # Adapt whatever shape your Runs.list returns (map or struct)
@@ -134,8 +135,8 @@ defmodule AgentWebWeb.RunHistoryLive do
     end
   end
 
-  defp clamp(n, min, max) when n < min, do: min
-  defp clamp(n, min, max) when n > max, do: max
+  defp clamp(n, min, _max) when n < min, do: min
+  defp clamp(n, _min, max) when n > max, do: max
   defp clamp(n, _min, _max), do: n
 
   @impl true
