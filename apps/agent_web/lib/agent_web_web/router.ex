@@ -44,6 +44,7 @@ defmodule AgentWebWeb.Router do
 
     get "/runs", RunController, :index
     get "/runs/:run_id", RunController, :show
+    get "/llm/profiles", LlmProfilesController, :index
     post "/llm/execute", LlmExecuteController, :execute
 
 

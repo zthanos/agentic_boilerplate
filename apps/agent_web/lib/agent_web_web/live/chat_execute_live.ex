@@ -1,5 +1,6 @@
 defmodule AgentWebWeb.ChatExecuteLive do
   use AgentWebWeb, :live_view
+  alias AgentWeb.Llm.ProfileStoreEcto
 
   @default_profile_id "req_llm"
 
@@ -13,9 +14,25 @@ defmodule AgentWebWeb.ChatExecuteLive do
   def mount(_params, _session, socket) do
     trace_id = new_trace_id()
 
+    profiles = ProfileStoreEcto.list([])
+
+
+    selected_profile_id =
+      cond do
+        Enum.any?(profiles, &(&1.id == @default_profile_id)) ->
+          @default_profile_id
+
+        profiles != [] ->
+          hd(profiles).id
+
+        true ->
+          @default_profile_id
+      end
+
     {:ok,
      socket
-     |> assign(:profile_id, @default_profile_id)
+     |> assign(:profiles, profiles)
+     |> assign(:profile_id, selected_profile_id)
      |> assign(:trace_id, trace_id)
      |> assign(:phase, "")
      |> assign(:prompt, "hi")
@@ -28,9 +45,18 @@ defmodule AgentWebWeb.ChatExecuteLive do
      |> assign(:stream_buffer, "")}
   end
 
+
   @impl true
   def handle_event("execute", params, socket) do
-    profile_id = Map.get(params, "profile_id", socket.assigns.profile_id)
+    requested_profile_id = Map.get(params, "profile_id", socket.assigns.profile_id)
+
+    profile_id =
+      if Enum.any?(socket.assigns.profiles, &(&1.id == requested_profile_id)) do
+        requested_profile_id
+      else
+        socket.assigns.profile_id
+      end
+
     phase = Map.get(params, "phase", "")
     prompt = Map.get(params, "prompt", "") |> to_string() |> String.trim()
 
@@ -206,13 +232,17 @@ defmodule AgentWebWeb.ChatExecuteLive do
           <!-- Left: form -->
           <div class="lg:col-span-2 border border-slate-700 rounded-lg p-4 bg-slate-800">
             <form phx-submit="execute">
-              <label class="block text-sm mb-1 text-slate-300">profile_id</label>
-              <input
+              <label class="block text-sm mb-1 text-slate-300">profile</label>
+              <select
                 name="profile_id"
-                value={@profile_id}
                 class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700"
-                placeholder="req_llm"
-              />
+              >
+                <%= for p <- @profiles do %>
+                  <option value={p.id} selected={@profile_id == p.id}>
+                    <%= p.name || p.id %><%= if !p.enabled, do: " (disabled)", else: "" %>
+                  </option>
+                <% end %>
+              </select>
 
               <div class="mt-3 grid grid-cols-2 gap-3">
                 <div>
