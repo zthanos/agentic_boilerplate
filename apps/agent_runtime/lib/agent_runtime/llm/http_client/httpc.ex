@@ -3,7 +3,9 @@ defmodule AgentRuntime.Llm.HttpClient.Httpc do
 
   @impl true
   def post(url, headers, body, http_opts, _opts) do
+
     send(self(), {:post, url, headers, body, http_opts})
+
 
     resp_body =
       ~s({"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{"total_tokens":1}})

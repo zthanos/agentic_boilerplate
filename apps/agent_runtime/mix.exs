@@ -28,6 +28,7 @@ defmodule AgentRuntime.MixProject do
   defp deps do
     [
       {:agent_core, in_umbrella: true},
+      {:finch, "~> 0.19"},
       {:jason, "~> 1.4"},
       {:ex_json_schema, "~> 0.10"}
       # {:dep_from_hexpm, "~> 0.3.0"},

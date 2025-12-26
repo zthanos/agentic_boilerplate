@@ -24,6 +24,11 @@ defmodule AgentWebWeb.Router do
 
   end
 
+  pipeline :sse do
+    plug :fetch_session
+  end
+
+
   scope "/api" do
     pipe_through :api
 
@@ -40,8 +45,16 @@ defmodule AgentWebWeb.Router do
     get "/runs", RunController, :index
     get "/runs/:run_id", RunController, :show
     post "/llm/execute", LlmExecuteController, :execute
+
+
   end
 
+  scope "/api", AgentWebWeb do
+    pipe_through :sse
+
+    post "/llm/execute/stream", LlmExecuteController, :stream
+
+  end
 
 
 

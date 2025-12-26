@@ -1,13 +1,9 @@
 defmodule AgentWebWeb.ChatExecuteLive do
   use AgentWebWeb, :live_view
 
-  alias AgentRuntime.Llm.Executor
-  alias AgentCore.Llm.Profiles
-  alias AgentWeb.Llm.InputMapper
-
   @default_profile_id "req_llm"
 
-  # 32-hex trace id (good enough for tracing; no extra deps)
+  # 32-hex trace id
   defp new_trace_id do
     :crypto.strong_rand_bytes(16)
     |> Base.encode16(case: :lower)
@@ -27,24 +23,23 @@ defmodule AgentWebWeb.ChatExecuteLive do
      |> assign(:last_run_id, nil)
      |> assign(:loading, false)
      |> assign(:result, nil)
-     |> assign(:error, nil)}
+     |> assign(:error, nil)
+     |> assign(:streaming, false)
+     |> assign(:stream_buffer, "")}
   end
 
   @impl true
-  def handle_event("execute", %{"prompt" => prompt} = params, socket) do
+  def handle_event("execute", params, socket) do
     profile_id = Map.get(params, "profile_id", socket.assigns.profile_id)
     phase = Map.get(params, "phase", "")
-    # If user provides trace_id in the input, use it; otherwise keep the session trace_id
-    trace_id_param = Map.get(params, "trace_id", "") |> String.trim()
+    prompt = Map.get(params, "prompt", "") |> to_string() |> String.trim()
+
+    trace_id_param = Map.get(params, "trace_id", "") |> to_string() |> String.trim()
     trace_id = if trace_id_param == "", do: socket.assigns.trace_id, else: trace_id_param
 
-    # Safe defaults (avoid KeyError if assigns change during refactors)
     messages0 = Map.get(socket.assigns, :messages, [])
     last_run_id = Map.get(socket.assigns, :last_run_id, nil)
 
-    prompt = (prompt || "") |> String.trim()
-
-    # Update UI state early
     socket =
       socket
       |> assign(:loading, true)
@@ -54,7 +49,6 @@ defmodule AgentWebWeb.ChatExecuteLive do
       |> assign(:phase, phase)
       |> assign(:trace_id, trace_id)
 
-    # If empty prompt, do nothing (keep UI stable)
     if prompt == "" do
       {:noreply, assign(socket, :loading, false)}
     else
@@ -67,47 +61,24 @@ defmodule AgentWebWeb.ChatExecuteLive do
         "messages" => messages
       }
 
-      exec_meta =
-        %{"trace_id" => trace_id}
+      payload =
+        %{
+          "profile_id" => profile_id,
+          "input" => input,
+          "overrides" => %{},
+          "trace_id" => trace_id
+        }
         |> maybe_put("parent_run_id", last_run_id)
         |> maybe_put("phase", blank_to_nil(phase))
 
-      profile = Profiles.get!(profile_id)
-
-      with {:ok, runtime_input} <- InputMapper.to_runtime(input),
-           {:ok,
-            %{response: resp, run_id: run_id, trace_id: tid, fingerprint: fp, latency_ms: latency}} <-
-             Executor.execute(profile, %{}, runtime_input, exec_meta) do
-        assistant_text = fetch_field(resp, [:output_text, "output_text"]) || ""
-
-        messages =
-          messages
-          |> append_msg("assistant", assistant_text)
-
-        result = %{
-          status: "ok",
-          output_text: assistant_text,
-          usage: fetch_field(resp, [:usage, "usage"]),
-          run_id: run_id,
-          trace_id: tid,
-          fingerprint: fp,
-          latency_ms: latency
-        }
-
-        {:noreply,
-         socket
-         |> assign(:messages, messages)
-         |> assign(:last_run_id, run_id)
-         |> assign(:result, result)
-         |> assign(:prompt, "")
-         |> assign(:loading, false)}
-      else
-        {:error, reason} ->
-          {:noreply, assign(socket, loading: false, error: normalize_error(reason))}
-
-        other ->
-          {:noreply, assign(socket, loading: false, error: normalize_error(other))}
-      end
+      {:noreply,
+       socket
+       |> assign(:messages, messages)
+       |> assign(:streaming, true)
+       |> assign(:stream_buffer, "")
+       |> assign(:prompt, "")
+       |> assign(:loading, false)
+       |> push_event("sse_start", %{url: "/api/llm/execute/stream", payload: payload})}
     end
   rescue
     _e in Ecto.NoResultsError ->
@@ -117,9 +88,52 @@ defmodule AgentWebWeb.ChatExecuteLive do
       {:noreply, assign(socket, loading: false, error: %{message: Exception.message(e)})}
   end
 
-  # Store messages in OpenAI-compatible shape (maps with string keys)
+  @impl true
+  def handle_event("sse_token", %{"token" => token}, socket) do
+    buf = (socket.assigns.stream_buffer || "") <> (token || "")
+    {:noreply, assign(socket, :stream_buffer, buf)}
+  end
+
+  @impl true
+  def handle_event("sse_done", %{"run_id" => run_id} = meta, socket) do
+    assistant_text = socket.assigns.stream_buffer || ""
+
+    messages =
+      socket.assigns.messages
+      |> append_msg("assistant", assistant_text)
+
+    result = %{
+      status: "ok",
+      output_text: assistant_text,
+      usage: Map.get(meta, "usage"),
+      run_id: run_id,
+      trace_id: Map.get(meta, "trace_id"),
+      fingerprint: Map.get(meta, "fingerprint"),
+      latency_ms: Map.get(meta, "latency_ms")
+    }
+
+    {:noreply,
+     socket
+     |> assign(:messages, messages)
+     |> assign(:last_run_id, run_id)
+     |> assign(:result, result)
+     |> assign(:streaming, false)
+     |> assign(:stream_buffer, "")}
+  end
+
+  @impl true
+  def handle_event("sse_error", %{"error" => err} = meta, socket) do
+    {:noreply,
+     socket
+     |> assign(:streaming, false)
+     |> assign(:loading, false)
+     |> assign(:error, %{message: inspect(err), meta: meta})}
+  end
+
+  # --- helpers ---
+
   defp append_msg(messages, role, content) do
-    content = (content || "") |> String.trim()
+    content = (content || "") |> to_string() |> String.trim()
 
     if content == "" do
       messages
@@ -136,20 +150,19 @@ defmodule AgentWebWeb.ChatExecuteLive do
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(v), do: v
 
-  defp fetch_field(map, keys) when is_map(map) do
-    Enum.find_value(keys, fn k -> Map.get(map, k) end)
-  end
+  defp bubble_class("user"),
+    do: "p-3 rounded border text-sm bg-slate-900 border-slate-700"
 
-  defp fetch_field(_other, _keys), do: nil
+  defp bubble_class("assistant"),
+    do: "p-3 rounded border text-sm bg-slate-950 border-slate-700"
 
-  defp normalize_error(%{__struct__: _} = s), do: %{message: inspect(s)}
-  defp normalize_error({a, b}), do: %{message: inspect(a), detail: inspect(b)}
-  defp normalize_error(other), do: %{message: inspect(other)}
+  defp bubble_class(_),
+    do: "p-3 rounded border text-sm bg-slate-900 border-slate-700"
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen p-6 bg-slate-900 text-slate-100">
+    <div id="llm-chat" phx-hook="LlmSSE" class="min-h-screen p-6 bg-slate-900 text-slate-100">
       <div class="max-w-5xl mx-auto">
         <div class="flex items-center justify-between">
           <div>
@@ -215,9 +228,9 @@ defmodule AgentWebWeb.ChatExecuteLive do
               <button
                 type="submit"
                 class="mt-3 w-full px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
-                disabled={@loading}
+                disabled={@loading or @streaming}
               >
-                <%= if @loading, do: "Executing…", else: "Execute" %>
+                <%= if @streaming, do: "Streaming…", else: if(@loading, do: "Executing…", else: "Execute") %>
               </button>
             </form>
 
@@ -229,15 +242,27 @@ defmodule AgentWebWeb.ChatExecuteLive do
             <% end %>
           </div>
 
-          <!-- Right: output -->
+          <!-- Right: conversation -->
           <div class="lg:col-span-3 border border-slate-700 rounded-lg p-4 bg-slate-800">
-            <h2 class="text-lg font-semibold">Response</h2>
+            <h2 class="text-lg font-semibold">Conversation</h2>
+
+            <div class="mt-3 space-y-3">
+              <%= for m <- @messages do %>
+                <div class={bubble_class(m["role"])}>
+                  <div class="text-xs text-slate-400 mb-1"><%= m["role"] %></div>
+                  <pre class="whitespace-pre-wrap"><%= m["content"] %></pre>
+                </div>
+              <% end %>
+
+              <%= if @streaming do %>
+                <div class="p-3 rounded border bg-slate-950 border-indigo-500/40 text-sm">
+                  <div class="text-xs text-slate-400 mb-1">assistant (streaming)</div>
+                  <pre class="whitespace-pre-wrap"><%= @stream_buffer %></pre>
+                </div>
+              <% end %>
+            </div>
 
             <%= if @result do %>
-              <div class="mt-3 p-3 rounded bg-slate-900 border border-slate-700">
-                <pre class="whitespace-pre-wrap text-sm"><%= @result.output_text %></pre>
-              </div>
-
               <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div class="p-3 rounded bg-slate-900 border border-slate-700">
                   <div class="text-slate-400">run_id</div>
@@ -270,10 +295,6 @@ defmodule AgentWebWeb.ChatExecuteLive do
                   <pre class="mt-2 whitespace-pre-wrap"><%= inspect(@result.usage, pretty: true) %></pre>
                 </div>
               <% end %>
-            <% else %>
-              <div class="mt-3 text-slate-400 text-sm">
-                Execute a prompt to see the response and run metadata.
-              </div>
             <% end %>
           </div>
         </div>
