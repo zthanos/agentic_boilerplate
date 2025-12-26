@@ -12,13 +12,52 @@ defmodule AgentWebWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug OpenApiSpex.Plug.PutApiSpec, module: AgentWeb.OpenApi
   end
 
   scope "/", AgentWebWeb do
     pipe_through :browser
 
     get "/", PageController, :home
+    live "/runs", RunHistoryLive, :index
+    live "/chat", ChatExecuteLive, :index
+
   end
+
+  pipeline :sse do
+    plug :fetch_session
+  end
+
+
+  scope "/api" do
+    pipe_through :api
+
+    get "/openapi", OpenApiSpex.Plug.RenderSpec, :show
+
+    get "/swaggerui", OpenApiSpex.Plug.SwaggerUI,
+      path: "/api/openapi",
+      default_model_expand_depth: 3
+  end
+
+  scope "/api", AgentWebWeb do
+    pipe_through :api
+
+    get "/runs", RunController, :index
+    get "/runs/:run_id", RunController, :show
+    post "/llm/execute", LlmExecuteController, :execute
+
+
+  end
+
+  scope "/api", AgentWebWeb do
+    pipe_through :sse
+
+    post "/llm/execute/stream", LlmExecuteController, :stream
+
+  end
+
+
+
 
   # Other scopes may use custom stacks.
   # scope "/api", AgentWebWeb do

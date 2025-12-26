@@ -26,11 +26,148 @@ import {hooks as colocatedHooks} from "phoenix-colocated/agent_web"
 import topbar from "../vendor/topbar"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+const Hooks = {
+  ...colocatedHooks,
+}
+
+Hooks.LlmSSE = {
+  mounted() {
+    this.abortController = null
+    this.reader = null
+    this.decoder = new TextDecoder()
+    this.buffer = ""
+    this.doneReceived = false
+
+    this.handleEvent("sse_start", async ({ url, payload }) => {
+      // cancel any previous stream
+      try {
+        if (this.abortController) this.abortController.abort()
+      } catch (_) {}
+
+      this.abortController = new AbortController()
+      this.buffer = ""
+      this.doneReceived = false
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "accept": "text/event-stream",
+          },
+          body: JSON.stringify(payload || {}),
+          signal: this.abortController.signal,
+        })
+
+        if (!res.ok) {
+          const text = await res.text()
+          this.pushEvent("sse_error", { error: { message: "http_error", status: res.status, body: text } })
+          return
+        }
+
+        if (!res.body) {
+          this.pushEvent("sse_error", { error: { message: "no_response_body" } })
+          return
+        }
+
+        this.reader = res.body.getReader()
+
+        while (true) {
+          const { value, done } = await this.reader.read()
+          if (done) break
+
+          this.buffer += this.decoder.decode(value, { stream: true })
+          this._drainFrames()
+          if (this.doneReceived) return
+        }
+
+        // Stream ended. If we didn't receive "done", treat it as disconnect/error
+        if (!this.doneReceived) {
+          this.pushEvent("sse_error", { error: { message: "stream_closed_before_done" } })
+        }
+      } catch (err) {
+        // If abort, ignore
+        if (err && err.name === "AbortError") return
+        this.pushEvent("sse_error", { error: { message: "fetch_stream_error", detail: String(err) } })
+      }
+    })
+  },
+
+  destroyed() {
+    try {
+      if (this.abortController) this.abortController.abort()
+    } catch (_) {}
+    this.abortController = null
+    this.reader = null
+  },
+
+  _drainFrames() {
+    // SSE frames are separated by \n\n
+    const parts = this.buffer.split("\n\n")
+    this.buffer = parts.pop() || ""
+
+    for (const frame of parts) {
+      const parsed = this._parseSseFrame(frame)
+      if (!parsed) continue
+
+      if (parsed.event === "token") {
+        try {
+          const data = JSON.parse(parsed.data || "{}")
+          this.pushEvent("sse_token", { token: data.token || "" })
+        } catch (err) {
+          this.pushEvent("sse_error", { error: { message: "token_parse_failed", detail: String(err) } })
+        }
+      } else if (parsed.event === "done") {
+        try {
+          const data = JSON.parse(parsed.data || "{}")
+          this.doneReceived = true
+          this.pushEvent("sse_done", data)
+        } catch (err) {
+          this.pushEvent("sse_error", { error: { message: "done_parse_failed", detail: String(err) } })
+        }
+      } else if (parsed.event === "error") {
+        try {
+          const data = JSON.parse(parsed.data || "{}")
+          this.doneReceived = true
+          this.pushEvent("sse_error", { error: data.error || data })
+        } catch (err) {
+          this.pushEvent("sse_error", { error: { message: "server_error_frame_parse_failed", detail: String(err) } })
+        }
+      }
+    }
+  },
+
+  _parseSseFrame(frame) {
+    // frame like:
+    // event: token
+    // data: {...}
+    const lines = frame.split("\n")
+    let event = null
+    let data = ""
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        event = line.slice("event:".length).trim()
+      } else if (line.startsWith("data:")) {
+        const chunk = line.slice("data:".length).trim()
+        // allow multi-line data, concatenate with \n
+        data = data ? data + "\n" + chunk : chunk
+      }
+    }
+
+    if (!event) return null
+    return { event, data }
+  }
+}
+
+
+
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: Hooks,
 })
+
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
