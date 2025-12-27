@@ -172,7 +172,9 @@ defmodule AgentWebWeb.LlmExecuteController do
               :ok
             end
 
-            result = Executor.execute_stream(profile, overrides, runtime_input, exec_meta, on_chunk)
+            # result = Executor.execute_stream(profile, overrides, runtime_input, exec_meta, on_chunk)
+            result = AgentRuntime.Llm.PlanExecutor.execute_plan_stream(profile, overrides, input, exec_meta, on_chunk)
+
             send(parent, {:sse_result, result})
             :ok
           end)
@@ -242,17 +244,24 @@ defmodule AgentWebWeb.LlmExecuteController do
 
         conn
 
-      {:DOWN, ^task_ref, :process, _pid, reason} ->
-        # Worker crashed before sending {:sse_result, ...}
-        _ =
-          send_event.(conn, "error", %{
-            "error" => %{
-              "message" => "stream_worker_crashed",
-              "detail" => inspect(reason)
-            }
-          })
+        {:DOWN, ^task_ref, :process, _pid, :normal} ->
+          # Worker exited normally AFTER sending sse_result
+          conn
 
-        conn
+        {:DOWN, ^task_ref, :process, _pid, :shutdown} ->
+          conn
+
+        {:DOWN, ^task_ref, :process, _pid, reason} ->
+          _ =
+            send_event.(conn, "error", %{
+              "error" => %{
+                "message" => "stream_worker_crashed",
+                "detail" => inspect(reason)
+              }
+            })
+
+          conn
+
     after
       60_000 ->
         # Keep-alive ping so intermediaries don't kill the connection

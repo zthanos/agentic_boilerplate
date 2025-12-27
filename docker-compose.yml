@@ -38,6 +38,7 @@ services:
         mix local.hex --force
         mix local.rebar --force
         mix deps.get
+        mix deps.clean mime --build
         mix compile
         cd apps/agent_web
         mix setup

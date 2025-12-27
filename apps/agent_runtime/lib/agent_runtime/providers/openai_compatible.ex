@@ -9,7 +9,7 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   """
 
   @behaviour AgentCore.Llm.ProviderAdapter
-
+  require Logger
   alias AgentCore.Llm.{ProviderRequest, ProviderResponse}
   alias AgentRuntime.Llm.ModelResolver
   alias AgentRuntime.Llm.HttpClient.FinchClient
@@ -21,6 +21,8 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   @impl true
   def call(%ProviderRequest{} = req) do
     cfg = ProviderConfig.openai_compatible()
+    model = req.invocation.model
+    Logger.info("[llm] CALL provider=openai_compatible url=#{cfg.base_url <>  @chat_path} model=#{inspect(model)}")
 
     with {:ok, {path, payload}} <- build_request(req),
          {:ok, body} <- json_encode(payload),
@@ -99,6 +101,9 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   @impl false
   def stream(%ProviderRequest{} = req, on_chunk) when is_function(on_chunk, 1) do
     cfg = ProviderConfig.openai_compatible()
+    model = req.invocation.model
+    Logger.info("[llm] CALL provider=openai_compatible url=#{cfg.base_url <> @chat_path} model=#{inspect(model)}")
+
 
     with {:ok, {path, payload}} <- build_stream_request(req),
          {:ok, body} <- json_encode(payload),

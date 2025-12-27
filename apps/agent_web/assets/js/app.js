@@ -144,9 +144,19 @@ Hooks.LlmSSE = {
         this.doneReceived = true
         const meta = evt.meta && Object.keys(evt.meta).length > 0 ? evt.meta : { done: true }
         this.pushEvent("sse_done", meta)
+      } else if (evt.type === "clarify") {
+        // NEW: Handle clarification requests
+        this.doneReceived = true
+        this.pushEvent("sse_clarify", {
+          trace_id: evt.trace_id,
+          question: evt.question
+        })
       } else if (evt.type === "error") {
         this.doneReceived = true
         this.pushEvent("sse_error", { error: evt.error || { message: "unknown_error" } })
+      } else if (evt.type === "ping") {
+        // Server keepalive - ignore silently
+        console.debug("SSE ping received")
       }
     }
   },
@@ -155,8 +165,10 @@ Hooks.LlmSSE = {
     // frame is multiple lines: "event: x\n" and/or "data: y\n"
     // We support:
     // - event: token, data: {"token":"..."}
-    // - event: done,  data: {"meta":{...}}
+    // - event: done,  data: {"run_id":"...", "trace_id":"...", ...}
+    // - event: clarify, data: {"trace_id":"...", "question":"..."}
     // - event: error, data: {"error":{...}}
+    // - event: ping, data: {"ts":123456}
     //
     // Also support "data: [DONE]" style (OpenAI-ish) defensively.
 
@@ -185,7 +197,8 @@ Hooks.LlmSSE = {
     if (!eventName) {
       const maybe = this._safeJson(dataStr)
       if (maybe?.token != null) return { type: "token", token: String(maybe.token) }
-      if (maybe?.meta != null) return { type: "done", meta: maybe.meta }
+      if (maybe?.run_id != null) return { type: "done", meta: maybe }
+      if (maybe?.question != null) return { type: "clarify", trace_id: maybe.trace_id, question: maybe.question }
       if (maybe?.error != null) return { type: "error", error: maybe.error }
       return null
     }
@@ -198,12 +211,34 @@ Hooks.LlmSSE = {
 
     if (eventName === "done") {
       const obj = this._safeJson(dataStr)
-      return { type: "done", meta: obj?.meta || {} }
+      // Controller sends flat structure with run_id, trace_id, etc.
+      return { type: "done", meta: obj || {} }
+    }
+
+    if (eventName === "clarify") {
+      // NEW: Parse clarification event
+      const obj = this._safeJson(dataStr)
+      if (!obj || !obj.question) return null
+      return {
+        type: "clarify",
+        trace_id: obj.trace_id,
+        question: obj.question
+      }
     }
 
     if (eventName === "error") {
       const obj = this._safeJson(dataStr)
       return { type: "error", error: obj?.error || { message: "unknown_error" } }
+    }
+
+    if (eventName === "ping") {
+      // Server keepalive
+      return { type: "ping" }
+    }
+
+    if (eventName === "open") {
+      // Stream initialization - ignore
+      return null
     }
 
     return null

@@ -29,9 +29,9 @@ defmodule AgentWeb.Llm.RunStoreEcto do
       |> Serialization.deep_jsonify()
 
     attrs = %{
-      run_id: snap.run_id,
-      trace_id: snap.trace_id,
-      parent_run_id: snap.parent_run_id,
+      run_id: normalize_uuid(snap.run_id),
+      trace_id: normalize_uuid(snap.trace_id),
+      parent_run_id: normalize_uuid(snap.parent_run_id),
       phase: snap.phase,
       fingerprint: snap.fingerprint,
       profile_id: to_string(snap.profile_id),
@@ -295,5 +295,37 @@ defmodule AgentWeb.Llm.RunStoreEcto do
       updated_at: r.updated_at
     }
   end
+
+  # Normalize UUID strings to proper format for :binary_id fields
+  defp normalize_uuid(nil), do: nil
+
+  defp normalize_uuid(uuid) when is_binary(uuid) do
+    # If it already has dashes, try to cast it (validates format)
+    if String.contains?(uuid, "-") do
+      case Ecto.UUID.cast(uuid) do
+        {:ok, normalized} -> normalized
+        :error -> uuid
+      end
+    else
+      # If it's a 32-character hex string without dashes, add dashes
+      if String.length(uuid) == 32 and String.match?(uuid, ~r/^[0-9a-fA-F]+$/) do
+        # Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        try do
+          <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4), e::binary-size(12)>> = uuid
+          "#{a}-#{b}-#{c}-#{d}-#{e}"
+        rescue
+          MatchError -> uuid
+        end
+      else
+        # Try to cast as-is (might be binary or other format)
+        case Ecto.UUID.cast(uuid) do
+          {:ok, normalized} -> normalized
+          :error -> uuid
+        end
+      end
+    end
+  end
+
+  defp normalize_uuid(other), do: other
 
 end

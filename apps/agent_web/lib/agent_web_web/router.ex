@@ -21,6 +21,7 @@ defmodule AgentWebWeb.Router do
     get "/", PageController, :home
     live "/runs", RunHistoryLive, :index
     live "/chat", ChatExecuteLive, :index
+    live "/plan", PlanExecuteLive, :index
 
   end
 
@@ -48,12 +49,14 @@ defmodule AgentWebWeb.Router do
     post "/llm/execute", LlmExecuteController, :execute
 
 
+
   end
 
   scope "/api", AgentWebWeb do
     pipe_through :sse
 
     post "/llm/execute/stream", LlmExecuteController, :stream
+    post "/plans/execute/stream", PlanExecuteController, :stream
 
   end
 

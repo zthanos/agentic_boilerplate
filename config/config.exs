@@ -26,6 +26,10 @@ config :agent_core, AgentCore.Llm.Profiles,
 config :agent_core, AgentCore.Llm.Runs,
   store: AgentWeb.Llm.RunStoreEcto
 
+# config/config.exs
+config :mime, :types, %{
+  "text/event-stream" => ["event-stream"]
+}
 # -----------------------------------------------------------------------------
 # Runtime defaults (can be overridden per env)
 # -----------------------------------------------------------------------------
