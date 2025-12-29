@@ -12,7 +12,7 @@ defmodule AgentCore.Llm.ProviderRequest do
     metadata: %{}
   ]
 
-  @type input_type :: :chat | :completion
+  @type input_type :: :chat | :completion | :embedding
 
   @type chat_message :: %{
           required(:role) => :system | :user | :assistant | :tool,

@@ -144,7 +144,7 @@ defmodule AgentWebWeb.LlmExecuteController do
 
       profile = Profiles.get!(profile_id)
 
-      with {:ok, runtime_input} <- InputMapper.to_runtime(input) do
+      with {:ok, _runtime_input} <- InputMapper.to_runtime(input) do
         conn =
           conn
           |> put_resp_header("content-type", "text/event-stream")

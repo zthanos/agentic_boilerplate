@@ -41,7 +41,8 @@ case db_adapter do
 
     config :agent_web, AgentWeb.Repo,
       url: database_url,
-      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+      types: AgentWeb.PostgrexTypes
 
   "sqlite" ->
     sqlite_path =
@@ -106,3 +107,5 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 end
+
+config :agent_runtime, :conversations_adapter, AgentWeb.Conversations.Adapter

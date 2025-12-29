@@ -13,29 +13,34 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   alias AgentCore.Llm.{ProviderRequest, ProviderResponse}
   alias AgentRuntime.Llm.ModelResolver
   alias AgentRuntime.Llm.HttpClient.FinchClient
+  alias AgentRuntime.Llm.ProviderConfig
 
   @chat_path "/chat/completions"
   @completion_path "/completions"
-  alias AgentRuntime.Llm.ProviderConfig
+  @embeddings_path "/embeddings"
 
   @impl true
   def call(%ProviderRequest{} = req) do
     cfg = ProviderConfig.openai_compatible()
     model = req.invocation.model
-    Logger.info("[llm] CALL provider=openai_compatible url=#{cfg.base_url <>  @chat_path} model=#{inspect(model)}")
 
-    with {:ok, {path, payload}} <- build_request(req),
-         {:ok, body} <- json_encode(payload),
-         {:ok, %{} = resp_map} <-
-           http_post(
-             cfg.base_url <> path,
-             body,
-             cfg.api_key,
-             cfg.timeout_ms,
-             cfg.connect_timeout_ms
-           ),
-         {:ok, provider_resp} <- parse_response(req, resp_map) do
-      {:ok, provider_resp}
+    with {:ok, {path, payload}} <- build_request(req) do
+      Logger.info(
+        "[llm] CALL provider=openai_compatible url=#{cfg.base_url <> path} model=#{inspect(model)}"
+      )
+
+      with {:ok, body} <- json_encode(payload),
+           {:ok, %{} = resp_map} <-
+             http_post(
+               cfg.base_url <> path,
+               body,
+               cfg.api_key,
+               cfg.timeout_ms,
+               cfg.connect_timeout_ms
+             ),
+           {:ok, provider_resp} <- parse_response(req, resp_map) do
+        {:ok, provider_resp}
+      end
     end
   end
 
@@ -74,6 +79,20 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
       |> drop_nil_values()}}
   end
 
+  defp build_request(%ProviderRequest{
+         invocation: inv,
+         input: %{type: :embedding, input: inputs}
+       }) do
+    provider = Map.get(inv, :provider, :openai_compatible)
+
+    {:ok,
+     {@embeddings_path,
+      %{
+        "model" => ModelResolver.resolve(provider, inv.model),
+        "input" => inputs
+      }}}
+  end
+
   defp build_request(%ProviderRequest{input: other}),
     do: {:error, {:unsupported_input, other}}
 
@@ -102,8 +121,10 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   def stream(%ProviderRequest{} = req, on_chunk) when is_function(on_chunk, 1) do
     cfg = ProviderConfig.openai_compatible()
     model = req.invocation.model
-    Logger.info("[llm] CALL provider=openai_compatible url=#{cfg.base_url <> @chat_path} model=#{inspect(model)}")
 
+    Logger.info(
+      "[llm] CALL provider=openai_compatible url=#{cfg.base_url <> @chat_path} model=#{inspect(model)}"
+    )
 
     with {:ok, {path, payload}} <- build_stream_request(req),
          {:ok, body} <- json_encode(payload),
@@ -376,6 +397,30 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
     text = c |> Map.get("text", "") |> to_string()
     usage = Map.get(raw, "usage", %{})
     {:ok, ProviderResponse.ok(text, raw: raw, usage: usage, finish_reason: c["finish_reason"])}
+  end
+
+  defp parse_response(
+         %ProviderRequest{input: %{type: :embedding}},
+         %{"data" => data} = raw
+       )
+       when is_list(data) do
+    usage = Map.get(raw, "usage", %{})
+
+    embeddings =
+      data
+      |> Enum.map(fn item ->
+        %{
+          embedding: Map.get(item, "embedding")
+        }
+      end)
+
+    {:ok,
+     ProviderResponse.ok(
+       "",
+       raw: %{data: embeddings},
+       usage: usage,
+       finish_reason: nil
+     )}
   end
 
   defp parse_response(_req, raw),

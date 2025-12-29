@@ -2,7 +2,7 @@
 defmodule AgentWebWeb.PlanExecuteController do
   use AgentWebWeb, :controller
   use OpenApiSpex.ControllerSpecs
-  alias AgentWeb.OpenApi.Schemas
+  # alias AgentWeb.OpenApi.Schemas
 
   alias AgentRuntime.Llm.PlanExecutor
   alias AgentCore.Llm.Profiles
@@ -62,12 +62,27 @@ defmodule AgentWebWeb.PlanExecuteController do
   defp build_exec_meta(params) do
     %{
       "trace_id" => Map.get(params, "trace_id"),
-      "parent_run_id" => Map.get(params, "parent_run_id"),
-      "phase" => Map.get(params, "phase")
+      "parent_run_id" => blank_to_nil(Map.get(params, "parent_run_id")),
+      "conversation_id" => valid_uuid_or_nil(Map.get(params, "conversation_id"))
     }
-    |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" end)
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Map.new()
   end
+
+  defp blank_to_nil(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: v)
+  defp blank_to_nil(v), do: v
+
+  defp valid_uuid_or_nil(v) when is_binary(v) do
+    v = String.trim(v)
+
+    case Ecto.UUID.cast(v) do
+      {:ok, _} -> v
+      :error -> nil
+    end
+  end
+
+  defp valid_uuid_or_nil(_), do: nil
+
 
   defp normalize_error(%{"message" => _} = m), do: m
   defp normalize_error(%{message: _} = m), do: Map.new(m)

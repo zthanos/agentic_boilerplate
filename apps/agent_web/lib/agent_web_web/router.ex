@@ -21,7 +21,10 @@ defmodule AgentWebWeb.Router do
     get "/", PageController, :home
     live "/runs", RunHistoryLive, :index
     live "/chat", ChatExecuteLive, :index
-    live "/plan", PlanExecuteLive, :index
+    live "/chat/:conversation_id", ChatExecuteLive, :index
+    live "/chat/:conversation_id/plan", PlanExecuteLive, :index
+    live "/conversations", ChatExecuteLive, :index
+    live "/conversations/:conversation_id", ChatExecuteLive, :index
 
   end
 

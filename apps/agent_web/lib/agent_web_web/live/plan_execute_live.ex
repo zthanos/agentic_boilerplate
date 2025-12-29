@@ -5,44 +5,50 @@ defmodule AgentWebWeb.PlanExecuteLive do
   @default_profile_id "req_llm"
   @stream_endpoint "/api/plans/execute/stream"
 
-  # 32-hex trace id
-  defp new_trace_id do
-    Ecto.UUID.generate()
-  end
 
   @impl true
-  def mount(_params, _session, socket) do
-    trace_id = new_trace_id()
+  def mount(%{"conversation_id" => conversation_id}, _session, socket) do
+    with {:ok, _} <- Ecto.UUID.cast(conversation_id) do
+      profiles = ProfileStoreEcto.list([])
 
-    profiles = ProfileStoreEcto.list([])
+      selected_profile_id =
+        cond do
+          Enum.any?(profiles, &(&1.id == @default_profile_id)) ->
+            @default_profile_id
 
-    selected_profile_id =
-      cond do
-        Enum.any?(profiles, &(&1.id == @default_profile_id)) ->
-          @default_profile_id
+          profiles != [] ->
+            hd(profiles).id
 
-        profiles != [] ->
-          hd(profiles).id
+          true ->
+            @default_profile_id
+        end
 
-        true ->
-          @default_profile_id
-      end
+      {:ok,
+       socket
+       |> assign(:conversation_id, conversation_id)
+       |> assign(:profiles, profiles)
+       |> assign(:profile_id, selected_profile_id)
+       |> assign(:trace_id, Ecto.UUID.generate()) # internal, not shown
+       |> assign(:prompt, "")
+       |> assign(:messages, [])
+       |> assign(:last_run_id, nil)
+       |> assign(:loading, false)
+       |> assign(:result, nil)
+       |> assign(:error, nil)
+       |> assign(:streaming, false)
+       |> assign(:stream_buffer, "")
+       |> assign(:conversations, [%{id: conversation_id, name: nil}])}
 
-    {:ok,
-     socket
-     |> assign(:profiles, profiles)
-     |> assign(:profile_id, selected_profile_id)
-     |> assign(:trace_id, trace_id)
-     |> assign(:phase, "")
-     |> assign(:prompt, "hi")
-     |> assign(:messages, [])
-     |> assign(:last_run_id, nil)
-     |> assign(:loading, false)
-     |> assign(:result, nil)
-     |> assign(:error, nil)
-     |> assign(:streaming, false)
-     |> assign(:stream_buffer, "")}
+    else
+      :error ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Invalid conversation id")
+         |> push_navigate(to: "/")}
+    end
   end
+
+
 
   @impl true
   def handle_event("execute", params, socket) do
@@ -88,10 +94,10 @@ defmodule AgentWebWeb.PlanExecuteLive do
             "profile_id" => profile_id,
             "input" => input,
             "overrides" => %{},
-            "trace_id" => trace_id
+            "conversation_id" => socket.assigns.conversation_id
           }
           |> maybe_put("parent_run_id", last_run_id)
-          |> maybe_put("phase", blank_to_nil(phase))
+
 
         {:noreply,
          socket
@@ -198,6 +204,24 @@ defmodule AgentWebWeb.PlanExecuteLive do
      |> assign(:error, %{message: inspect(err), meta: payload})}
   end
 
+  @impl true
+  def handle_event("new_conversation", _params, socket) do
+    new_id = Ecto.UUID.generate()
+    {:noreply, push_navigate(socket, to: "/chat/#{new_id}/plan")}
+  end
+
+
+  @impl true
+  def handle_event("clear_messages", _params, socket) do
+    {:noreply,
+    socket
+    |> assign(:messages, [])
+    |> assign(:result, nil)
+    |> assign(:error, nil)
+    |> assign(:stream_buffer, "")
+    |> assign(:streaming, false)}
+  end
+
   # --- helpers ---
 
   defp append_msg(messages, role, content) do
@@ -207,7 +231,7 @@ defmodule AgentWebWeb.PlanExecuteLive do
       messages
     else
       # messages ++ [%{"role" => role, "content" => content}]
-      [%{"role" => role, "content" => content}]
+      messages ++ [%{"role" => role, "content" => content}]
     end
   end
 
@@ -215,9 +239,9 @@ defmodule AgentWebWeb.PlanExecuteLive do
   defp maybe_put(map, _k, ""), do: map
   defp maybe_put(map, k, v), do: Map.put(map, k, v)
 
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(v), do: v
+  # defp blank_to_nil(""), do: nil
+  # defp blank_to_nil(nil), do: nil
+  # defp blank_to_nil(v), do: v
 
   defp bubble_class("user"), do: "p-4 rounded-xl bg-slate-800 border border-slate-700"
 

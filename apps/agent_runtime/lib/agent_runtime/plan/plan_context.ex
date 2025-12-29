@@ -55,6 +55,11 @@ defmodule AgentRuntime.Llm.Plan.PlanContext do
     %{ctx | augmented_messages: msgs}
   end
 
+  def add_augmented_message(%__MODULE__{} = ctx, msg) when is_map(msg) do
+    existing = ctx.augmented_messages || []
+    %{ctx | augmented_messages: existing ++ [msg]}
+  end
+
   def final_messages(%__MODULE__{} = ctx) do
     case ctx.augmented_messages do
       msgs when is_list(msgs) -> msgs
