@@ -3,6 +3,49 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
 
   alias AgentRuntime.Llm.Plan.PlanContext
 
+  # -----------------------
+  # New: System prompt helpers
+  # -----------------------
+
+  @doc """
+  Resolve the effective system prompt with precedence:
+
+  1) ctx.exec_meta["agent_system_prompt"]
+  2) ctx.exec_meta["system_prompt"]
+  3) default_prompt (argument)
+  """
+  def system_prompt(%PlanContext{} = ctx, default_prompt \\ "") do
+    agent =
+      get_in(ctx.exec_meta || %{}, ["agent_system_prompt"]) ||
+        get_in(ctx.exec_meta || %{}, [:agent_system_prompt])
+
+    sys =
+      get_in(ctx.exec_meta || %{}, ["system_prompt"]) ||
+        get_in(ctx.exec_meta || %{}, [:system_prompt])
+
+    (agent || sys || default_prompt || "")
+    |> to_string()
+    |> String.trim()
+  end
+
+  @doc """
+  Build a system message map using the effective system prompt.
+  Returns nil if prompt is blank.
+  """
+  def system_message(%PlanContext{} = ctx, default_prompt \\ "") do
+    prompt = system_prompt(ctx, default_prompt)
+
+    if prompt == "" do
+      nil
+    else
+      %{"role" => "system", "content" => prompt}
+    end
+  end
+
+  # -----------------------
+  # Existing helpers
+  # -----------------------
+
   def last_user_prompt(%PlanContext{} = ctx) do
     ctx
     |> PlanContext.get_messages()
@@ -29,34 +72,28 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
   defp extract_json_object(text) do
     text = String.trim(text)
 
-    # Προσπάθησε να βρεις JSON με διάφορους τρόπους
     cond do
-      # 1. Αν είναι ήδη JSON
       String.starts_with?(text, "{") and String.ends_with?(text, "}") ->
         text
 
-      # 2. Ψάξε για ```json ... ```
       String.contains?(text, "```json") ->
         case Regex.run(~r/```json\s*(\{.*?\})\s*```/s, text) do
           [_, json] -> String.trim(json)
           _ -> find_last_json_block(text)
         end
 
-      # 3. Βρες το τελευταίο {...}
       true ->
         find_last_json_block(text)
     end
   end
 
   defp find_last_json_block(text) do
-    # Απλή προσέγγιση: βρες το τελευταίο { και το αντίστοιχο }
     case :binary.matches(text, "{") do
-      [] -> nil
-      positions ->
-        # Πάρε το τελευταίο {
-        {last_open, _} = List.last(positions)
+      [] ->
+        nil
 
-        # Προσπάθησε να βρεις balanced }
+      positions ->
+        {last_open, _} = List.last(positions)
         try_extract_from_position(text, last_open)
     end
   end
@@ -64,7 +101,6 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
   defp try_extract_from_position(text, start_pos) do
     substring = String.slice(text, start_pos..-1//1)
 
-    # Βρες το matching closing brace
     case find_matching_brace(substring, 0, 0) do
       nil -> nil
       end_pos -> String.slice(substring, 0..end_pos)
@@ -72,13 +108,17 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
   end
 
   defp find_matching_brace(<<>>, _pos, _depth), do: nil
+
   defp find_matching_brace(<<"{", rest::binary>>, pos, depth) do
     find_matching_brace(rest, pos + 1, depth + 1)
   end
+
   defp find_matching_brace(<<"}", _rest::binary>>, pos, 1), do: pos
+
   defp find_matching_brace(<<"}", rest::binary>>, pos, depth) when depth > 1 do
     find_matching_brace(rest, pos + 1, depth - 1)
   end
+
   defp find_matching_brace(<<_char, rest::binary>>, pos, depth) do
     find_matching_brace(rest, pos + 1, depth)
   end
@@ -91,7 +131,6 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
       _ -> %{}
     end
   end
-
 
   def boolean(map, key, default \\ false) when is_map(map) do
     case Map.get(map, key) do
@@ -114,7 +153,6 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
     end
   end
 
-
   def enforce_null_when_false(map, bool_key, string_key) when is_map(map) do
     case boolean(map, bool_key, false) do
       true -> map
@@ -133,5 +171,4 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
   end
 
   def extract_output_text(_), do: ""
-
 end

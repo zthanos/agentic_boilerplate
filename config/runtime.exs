@@ -80,7 +80,8 @@ config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
     base_url: base_url,
     api_key: System.get_env("OPENAI_COMPAT_API_KEY") || "",
     timeout_ms: String.to_integer(System.get_env("OPENAI_COMPAT_TIMEOUT_MS") || "60000"),
-    connect_timeout_ms: String.to_integer(System.get_env("OPENAI_COMPAT_CONNECT_TIMEOUT_MS") || "10000")
+    connect_timeout_ms:
+      String.to_integer(System.get_env("OPENAI_COMPAT_CONNECT_TIMEOUT_MS") || "10000")
   ]
 
 # -----------------------------------------------------------------------------
@@ -111,3 +112,5 @@ end
 config :agent_runtime, :conversations_adapter, AgentWeb.Conversations.Adapter
 
 config :agent_runtime, :plan_store, AgentWeb.Llm.PlanStoreEcto
+
+config :agent_runtime, :agent_store, AgentWeb.Llm.AgentStoreEcto

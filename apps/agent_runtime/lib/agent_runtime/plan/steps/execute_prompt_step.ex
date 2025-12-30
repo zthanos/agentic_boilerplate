@@ -5,6 +5,7 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
 
   alias AgentRuntime.Llm.Plan.PlanContext
   alias AgentRuntime.Llm.Executor
+  alias AgentRuntime.Llm.Plan.StepUtils
 
   @impl true
   def name, do: "execute_prompt"
@@ -85,40 +86,45 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
     end
   end
 
-  # NEW HELPER - Build complete message list
   defp build_complete_messages(%PlanContext{} = ctx) do
-    # 1. Base system prompt
-    base_system = %{
-      role: :system,
-      content: """
-      You are a helpful AI assistant. Answer questions clearly and accurately.
-      When context from previous conversation is provided, use it to understand
-      references like "that", "it", etc. You may use your general knowledge
-      to expand on the provided context.
-      """
-    }
+    # 1. System prompt (agent-aware)
+    default_system_prompt = """
+    You are a helpful AI assistant. Answer questions clearly and accurately.
+    When context from previous conversation is provided, use it to understand
+    references like "that", "it", etc. You may use your general knowledge
+    to expand on the provided context.
+    """
 
-    messages = [base_system]
+    system_message = StepUtils.system_message(ctx, default_system_prompt)
+
+    messages =
+      [system_message]
+      |> Enum.reject(&is_nil/1)
 
     # 2. Add augmented context (from memory retrieval) if present
     messages =
       case ctx.augmented_messages do
         nil ->
           messages
+
         [] ->
           messages
+
         aug when is_list(aug) ->
-          # Normalize and add augmented messages
-          augmented = Enum.map(aug, fn msg ->
-            case msg do
-              %{"role" => r, "content" => c} ->
-                %{role: normalize_role(r), content: c}
-              %{role: r, content: c} ->
-                %{role: normalize_role(r), content: c}
-              _ ->
-                msg
-            end
-          end)
+          augmented =
+            Enum.map(aug, fn msg ->
+              case msg do
+                %{"role" => r, "content" => c} ->
+                  %{role: normalize_role(r), content: c}
+
+                %{role: r, content: c} ->
+                  %{role: normalize_role(r), content: c}
+
+                _ ->
+                  msg
+              end
+            end)
+
           messages ++ augmented
       end
 
@@ -175,7 +181,13 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
   # Persistence + ingestion
   # -----------------------
 
-  defp maybe_persist_and_ingest(conversation_id, user_id, {user_msg, _user_text}, assistant_text, _result) do
+  defp maybe_persist_and_ingest(
+         conversation_id,
+         user_id,
+         {user_msg, _user_text},
+         assistant_text,
+         _result
+       ) do
     case {safe_uuid(conversation_id), user_msg} do
       {{:ok, conv_id}, %{id: _}} ->
         module = conversations_module()
@@ -184,8 +196,12 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
         assistant_text =
           case String.trim(to_string(assistant_text || "")) do
             "" ->
-              Logger.warning("[execute_prompt] empty assistant_text; skipping assistant persist/ingest")
+              Logger.warning(
+                "[execute_prompt] empty assistant_text; skipping assistant persist/ingest"
+              )
+
               nil
+
             txt ->
               txt
           end
@@ -199,8 +215,10 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
 
                 apply(ingest_module, :ingest_turn!, [
                   conv_id,
-                  user_msg,           # This already has :id
-                  assistant_msg       # This has :id too
+                  # This already has :id
+                  user_msg,
+                  # This has :id too
+                  assistant_msg
                 ])
               rescue
                 e ->
@@ -259,8 +277,6 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
           |> to_string()
     end
   end
-
-
 
   # Very defensive extractor (adjust later once you confirm Executor’s exact return shape)
   defp extract_assistant_text_from_result({:ok, %{text: t}}), do: to_string(t)

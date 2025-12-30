@@ -50,6 +50,8 @@ defmodule AgentWebWeb.Router do
     get "/runs/:run_id", RunController, :show
     get "/llm/profiles", LlmProfilesController, :index
     post "/llm/execute", LlmExecuteController, :execute
+    get "/agents", AgentController, :index
+    get "/agents/:agent_id/latest", AgentController, :show_latest
 
 
 
@@ -60,6 +62,7 @@ defmodule AgentWebWeb.Router do
 
     post "/llm/execute/stream", LlmExecuteController, :stream
     post "/plans/execute/stream", PlanExecuteController, :stream
+    post "/agents/execute/stream", AgentExecuteController, :stream
 
   end
 

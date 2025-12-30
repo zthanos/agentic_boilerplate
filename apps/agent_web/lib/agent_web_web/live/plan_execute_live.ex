@@ -3,13 +3,25 @@ defmodule AgentWebWeb.PlanExecuteLive do
   alias AgentWeb.Llm.ProfileStoreEcto
 
   @default_profile_id "req_llm"
-  @stream_endpoint "/api/plans/execute/stream"
-  @default_plan_id "history_rag"
+  alias AgentWeb.Llm.AgentStoreEcto
 
+  @stream_endpoint "/api/agents/execute/stream"
+  @default_agent_id "arch_assistant"
 
   @impl true
   def mount(%{"conversation_id" => conversation_id}, _session, socket) do
     with {:ok, _} <- Ecto.UUID.cast(conversation_id) do
+      # AgentStoreEcto.list returns {:ok, list}
+      {:ok, agents} = AgentStoreEcto.list(status: "active")
+
+      selected_agent_id =
+        cond do
+          Enum.any?(agents, &(&1.id == @default_agent_id)) -> @default_agent_id
+          agents != [] -> hd(agents).id
+          true -> @default_agent_id
+        end
+
+      # ProfileStoreEcto.list returns just the list, not a tuple
       profiles = ProfileStoreEcto.list([])
 
       selected_profile_id =
@@ -29,18 +41,20 @@ defmodule AgentWebWeb.PlanExecuteLive do
        |> assign(:conversation_id, conversation_id)
        |> assign(:profiles, profiles)
        |> assign(:profile_id, selected_profile_id)
-       |> assign(:trace_id, Ecto.UUID.generate()) # internal, not shown
+       # internal, not shown
+       |> assign(:trace_id, Ecto.UUID.generate())
        |> assign(:prompt, "")
        |> assign(:messages, [])
        |> assign(:last_run_id, nil)
-       |> assign(:plan_id, @default_plan_id)
+       |> assign(:agents, agents)
+       |> assign(:agent_id, selected_agent_id)
+       |> assign(:agent_version, "latest")
        |> assign(:loading, false)
        |> assign(:result, nil)
        |> assign(:error, nil)
        |> assign(:streaming, false)
        |> assign(:stream_buffer, "")
        |> assign(:conversations, [%{id: conversation_id, name: nil}])}
-
     else
       :error ->
         {:ok,
@@ -49,8 +63,6 @@ defmodule AgentWebWeb.PlanExecuteLive do
          |> push_navigate(to: "/")}
     end
   end
-
-
 
   @impl true
   def handle_event("execute", params, socket) do
@@ -81,45 +93,45 @@ defmodule AgentWebWeb.PlanExecuteLive do
       |> assign(:phase, phase)
       |> assign(:trace_id, trace_id)
 
-      if prompt == "" do
-        {:noreply, assign(socket, :loading, false)}
-      else
-        # messages = messages0 |> append_msg("user", prompt)
-        new_messages = socket.assigns.messages |> append_msg("user", prompt)
+    if prompt == "" do
+      {:noreply, assign(socket, :loading, false)}
+    else
+      # messages = messages0 |> append_msg("user", prompt)
+      new_messages = socket.assigns.messages |> append_msg("user", prompt)
 
-        # current_message = [] |> append_msg("user", prompt)
+      # current_message = [] |> append_msg("user", prompt)
 
+      input = %{
+        "type" => "chat",
+        "messages" => [%{"role" => "user", "content" => prompt}]
+      }
 
-
-        input = %{
-          "type" => "chat",
-          "messages" => [%{"role" => "user", "content" => prompt}]
+      payload =
+        %{
+          "profile_id" => profile_id,
+          "agent_id" => socket.assigns.agent_id,
+          "agent_version" => socket.assigns.agent_version,
+          "input" => input,
+          "overrides" => %{},
+          "conversation_id" => socket.assigns.conversation_id
         }
+        |> maybe_put("parent_run_id", socket.assigns.last_run_id)
+        # Προσθήκη trace_id
+        |> maybe_put("trace_id", trace_id)
 
-        payload =
-          %{
-            "profile_id" => profile_id,
-            "plan_id" => socket.assigns.plan_id,
-            "input" => input,
-            "overrides" => %{},
-            "conversation_id" => socket.assigns.conversation_id
-          }
-          |> maybe_put("parent_run_id", socket.assigns.last_run_id)
-          |> maybe_put("trace_id", trace_id)  # Προσθήκη trace_id
-
-
-        {:noreply,
-         socket
-         |> assign(:messages, new_messages)
-         |> assign(:streaming, true)
-         |> assign(:stream_buffer, "")
-         |> assign(:prompt, "")
-         |> assign(:loading, false)
-         |> push_event("sse_start", %{
-           url: @stream_endpoint,  # ΑΛΛΑΓΗ: Χρήση module attribute
-           payload: payload
-         })}
-      end
+      {:noreply,
+       socket
+       |> assign(:messages, new_messages)
+       |> assign(:streaming, true)
+       |> assign(:stream_buffer, "")
+       |> assign(:prompt, "")
+       |> assign(:loading, false)
+       |> push_event("sse_start", %{
+         # ΑΛΛΑΓΗ: Χρήση module attribute
+         url: @stream_endpoint,
+         payload: payload
+       })}
+    end
   rescue
     _e in Ecto.NoResultsError ->
       {:noreply, assign(socket, loading: false, error: %{message: "profile_not_found"})}
@@ -222,16 +234,21 @@ defmodule AgentWebWeb.PlanExecuteLive do
     {:noreply, push_navigate(socket, to: "/chat/#{new_id}/plan")}
   end
 
-
   @impl true
   def handle_event("clear_messages", _params, socket) do
     {:noreply,
-    socket
-    |> assign(:messages, [])
-    |> assign(:result, nil)
-    |> assign(:error, nil)
-    |> assign(:stream_buffer, "")
-    |> assign(:streaming, false)}
+     socket
+     |> assign(:messages, [])
+     |> assign(:result, nil)
+     |> assign(:error, nil)
+     |> assign(:stream_buffer, "")
+     |> assign(:streaming, false)}
+  end
+
+  @impl true
+  def handle_event("select_agent", %{"agent_id" => agent_id}, socket) do
+    valid? = Enum.any?(socket.assigns.agents, &(&1.id == agent_id))
+    {:noreply, assign(socket, :agent_id, if(valid?, do: agent_id, else: socket.assigns.agent_id))}
   end
 
   # --- helpers ---
@@ -291,6 +308,4 @@ defmodule AgentWebWeb.PlanExecuteLive do
     do: "px-3 py-1 text-xs rounded-full bg-yellow-900/30 text-yellow-400"
 
   defp status_badge_class(_), do: "px-3 py-1 text-xs rounded-full bg-slate-700 text-slate-300"
-
-
 end

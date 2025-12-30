@@ -13,7 +13,8 @@
 alias AgentCore.Llm.{LLMProfile, Profiles}
 alias AgentCore.Llm.Plan.Definition
 alias AgentWeb.Llm.PlanStoreEcto
-
+alias AgentCore.Llm.Agent.Definition, as: AgentDef
+alias AgentWeb.Llm.AgentStoreEcto
 
 req_llm =
   %AgentCore.Llm.LLMProfile{
@@ -79,4 +80,30 @@ plan =
 case PlanStoreEcto.get(plan.id, plan.version) do
   {:ok, _} -> :ok
   {:error, :not_found} -> PlanStoreEcto.put(plan)
+end
+
+
+
+
+agent =
+  AgentDef.new(%{
+    id: "arch_assistant",
+    version: 1,
+    name: "Architect Assistant",
+    plan: %{"id" => "history_rag", "version" => 1},
+    profiles: %{
+      "execution_profile_id" => "req_llm",
+      "assessor_profile_id" => "req_llm"
+    },
+    prompts: %{
+      "system" => "You are a policy-driven Architect Assistant Agent. Follow the plan and policies strictly."
+    },
+    policies: %{}
+  })
+
+{:ok, agent} = AgentDef.validate(agent)
+
+case AgentStoreEcto.get(agent.id, agent.version) do
+  {:ok, _} -> :ok
+  {:error, :not_found} -> AgentStoreEcto.put(agent)
 end
