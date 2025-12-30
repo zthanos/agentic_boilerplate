@@ -11,6 +11,9 @@
 # and so on) as they will fail if something goes wrong.
 
 alias AgentCore.Llm.{LLMProfile, Profiles}
+alias AgentCore.Llm.Plan.Definition
+alias AgentWeb.Llm.PlanStoreEcto
+
 
 req_llm =
   %AgentCore.Llm.LLMProfile{
@@ -53,4 +56,27 @@ embeddings_nomic_v15 =
 case Profiles.put(embeddings_nomic_v15) do
   {:ok, _} -> IO.puts("Seeded profile: embeddings_nomic_v15")
   {:error, err} -> IO.inspect(err, label: "Failed to seed embeddings_nomic_v15")
+end
+
+plan =
+  Definition.new(%{
+    id: "history_rag",
+    version: 1,
+    name: "History RAG",
+    policies: %{
+      "retrieval" => %{"top_k" => 8, "min_score" => 0.78}
+    },
+    steps: [
+      "AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStep",
+      "AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep",
+      "AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep",
+      "AgentRuntime.Llm.Plan.Steps.ExecutePromptStep"
+    ]
+  })
+
+{:ok, plan} = Definition.validate(plan)
+
+case PlanStoreEcto.get(plan.id, plan.version) do
+  {:ok, _} -> :ok
+  {:error, :not_found} -> PlanStoreEcto.put(plan)
 end

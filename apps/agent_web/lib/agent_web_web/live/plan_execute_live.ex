@@ -4,6 +4,7 @@ defmodule AgentWebWeb.PlanExecuteLive do
 
   @default_profile_id "req_llm"
   @stream_endpoint "/api/plans/execute/stream"
+  @default_plan_id "history_rag"
 
 
   @impl true
@@ -32,6 +33,7 @@ defmodule AgentWebWeb.PlanExecuteLive do
        |> assign(:prompt, "")
        |> assign(:messages, [])
        |> assign(:last_run_id, nil)
+       |> assign(:plan_id, @default_plan_id)
        |> assign(:loading, false)
        |> assign(:result, nil)
        |> assign(:error, nil)
@@ -97,6 +99,7 @@ defmodule AgentWebWeb.PlanExecuteLive do
         payload =
           %{
             "profile_id" => profile_id,
+            "plan_id" => socket.assigns.plan_id,
             "input" => input,
             "overrides" => %{},
             "conversation_id" => socket.assigns.conversation_id

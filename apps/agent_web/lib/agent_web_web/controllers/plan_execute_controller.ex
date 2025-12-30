@@ -1,26 +1,28 @@
-# apps/agent_web/lib/agent_web_web/controllers/llm_execute_controller.ex
 defmodule AgentWebWeb.PlanExecuteController do
   use AgentWebWeb, :controller
   use OpenApiSpex.ControllerSpecs
-  # alias AgentWeb.OpenApi.Schemas
 
   alias AgentRuntime.Llm.PlanExecutor
   alias AgentCore.Llm.Profiles
   alias AgentWeb.Llm.InputMapper
   alias AgentWeb.Streaming.SseManager
 
-  # ... execute/2 remains unchanged ...
+  # NOTE:
+  # - Controller is plan-driven: requires plan_id (and optional plan_version).
+  # - No default steps here. No step wiring here.
+  # - Runtime handles plan loading/resolution via configured PlanStore.
 
-  def stream(conn, %{"profile_id" => profile_id, "input" => input} = params) do
+  def stream(conn, %{"profile_id" => profile_id, "plan_id" => plan_id, "input" => input} = params) do
     overrides = Map.get(params, "overrides", %{})
+    plan_version = normalize_plan_version(Map.get(params, "plan_version"))
 
-    if is_nil(profile_id) or profile_id == "" or not is_map(input) do
+    if blank?(profile_id) or blank?(plan_id) or not is_map(input) do
       conn
       |> put_status(:bad_request)
       |> json(%{
         "status" => "error",
         "error" => "invalid_request",
-        "details" => "Expected profile_id and input"
+        "details" => "Expected profile_id, plan_id and input"
       })
     else
       exec_meta = build_exec_meta(params)
@@ -36,7 +38,11 @@ defmodule AgentWebWeb.PlanExecuteController do
             runtime_input,
             exec_meta,
             on_chunk,
-            memory_store: AgentWeb.Memory.Store
+            [
+              plan_id: plan_id,
+              plan_version: plan_version,
+              memory_store: AgentWeb.Memory.Store
+            ]
           )
         end)
       else
@@ -58,11 +64,13 @@ defmodule AgentWebWeb.PlanExecuteController do
       |> json(%{"status" => "error", "error" => %{"message" => Exception.message(e)}})
   end
 
-  # Helper functions
+  # -----------------------
+  # Helpers
+  # -----------------------
 
   defp build_exec_meta(params) do
     %{
-      "trace_id" => Map.get(params, "trace_id"),
+      "trace_id" => blank_to_nil(Map.get(params, "trace_id")),
       "parent_run_id" => blank_to_nil(Map.get(params, "parent_run_id")),
       "conversation_id" => valid_uuid_or_nil(Map.get(params, "conversation_id"))
     }
@@ -70,7 +78,37 @@ defmodule AgentWebWeb.PlanExecuteController do
     |> Map.new()
   end
 
-  defp blank_to_nil(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: v)
+  defp normalize_plan_version(nil), do: :latest
+
+  defp normalize_plan_version(v) when is_integer(v) and v >= 0, do: v
+
+  defp normalize_plan_version(v) when is_binary(v) do
+    v = String.trim(v)
+
+    cond do
+      v == "" ->
+        :latest
+
+      v == "latest" ->
+        :latest
+
+      true ->
+        case Integer.parse(v) do
+          {n, ""} when n >= 0 -> n
+          _ -> :latest
+        end
+    end
+  end
+
+  defp normalize_plan_version(_), do: :latest
+
+  defp blank?(v) when is_binary(v), do: String.trim(v) == ""
+  defp blank?(_), do: true
+
+  defp blank_to_nil(v) when is_binary(v) do
+    if String.trim(v) == "", do: nil, else: v
+  end
+
   defp blank_to_nil(v), do: v
 
   defp valid_uuid_or_nil(v) when is_binary(v) do
@@ -83,7 +121,6 @@ defmodule AgentWebWeb.PlanExecuteController do
   end
 
   defp valid_uuid_or_nil(_), do: nil
-
 
   defp normalize_error(%{"message" => _} = m), do: m
   defp normalize_error(%{message: _} = m), do: Map.new(m)

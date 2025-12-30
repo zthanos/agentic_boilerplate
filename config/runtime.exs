@@ -109,3 +109,5 @@ if config_env() == :prod do
 end
 
 config :agent_runtime, :conversations_adapter, AgentWeb.Conversations.Adapter
+
+config :agent_runtime, :plan_store, AgentWeb.Llm.PlanStoreEcto

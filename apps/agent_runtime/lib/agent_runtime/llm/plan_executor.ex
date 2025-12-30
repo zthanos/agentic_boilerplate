@@ -1,56 +1,64 @@
 defmodule AgentRuntime.Llm.PlanExecutor do
   @moduledoc """
-  Plan-driven execution wrapper with phase-based RunSnapshot tracking.
+  Policy-driven Plan Execution Engine.
 
-  Each step execution is tracked with its own phase in RunSnapshot:
-  - "assess_history" - History assessment step
-  - "assess_clarification" - Clarification assessment step
-  - "retrieve_memory" - Memory retrieval step
-  - "execute" - Final prompt execution step
-
-  This enables end-to-end observability of the entire plan execution.
+  Key semantics:
+  - Execution is always plan-driven (plan_id required).
+  - Plan artifact is loaded from configured PlanStore (DI via AgentRuntime.Llm.Plan.Store.impl!/0).
+  - Steps are resolved/validated at runtime (Resolver).
+  - Each step runs with a phase in exec_meta and (optionally) parent_run_id derived from prior step debug trail.
+  - Step opts are composed from:
+      (a) per-step opts (opts[:step_opts][StepModule])
+      (b) injected infra opts (assessor_profile, assessor_overrides, memory_store, mode, on_chunk)
+      (c) plan policies (plan.policies["steps"][step_mod.name()])
   """
+
   require Logger
+
   alias AgentRuntime.Llm.Plan.PlanContext
-
-
-  @default_steps [
-    AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStep,
-    AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep,
-    AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep,
-    AgentRuntime.Llm.Plan.Steps.ExecutePromptStep
-  ]
+  alias AgentRuntime.Llm.Plan.Resolver
+  alias AgentRuntime.Llm.Plan.Store
 
   @typedoc """
-  Result of executing a plan.
-
-  - `{:ok, map}` – successful low-level executor result (wrapped response, run_id, etc)
-  - `{:ok, %{mode: :needs_clarification, ...}}` – plan decided it needs a clarification question
-  - `{:error, term}` – any error from steps or executor
+  Engine result:
+  - `{:ok, map}` – final low-level executor result (wrapped response, run_id, trace_id, etc.)
+  - `{:ok, %{mode: :needs_clarification, trace_id: ..., question: ...}}`
+  - `{:error, term}`
   """
   @type result ::
           {:ok, map()}
           | {:ok, %{mode: :needs_clarification, trace_id: String.t(), question: String.t()}}
           | {:error, term()}
 
+  # -----------------------
+  # Public API (plan-driven)
+  # -----------------------
+
+  @doc """
+  Execute a plan (non-streaming). Requires :plan_id in opts.
+  Optional: :plan_version (integer or :latest, default :latest).
+  """
   @spec execute_plan(profile :: term(), overrides :: map(), input :: map(), exec_meta :: map(), keyword()) ::
           result()
   def execute_plan(profile, overrides, input, exec_meta, opts \\ []) when is_map(exec_meta) do
-    steps = Keyword.get(opts, :steps, @default_steps)
+    plan_id = Keyword.fetch!(opts, :plan_id)
+    plan_version = Keyword.get(opts, :plan_version, :latest)
 
-    # Ensure we have a trace_id for tracking the entire plan
-    trace_id = Map.get(exec_meta, "trace_id") || Map.get(exec_meta, :trace_id) || generate_trace_id()
-
-    ctx = %PlanContext{
-      profile: profile,
-      overrides: overrides || %{},
-      input: input,
-      exec_meta: Map.put(exec_meta, "trace_id", trace_id)
-    }
-
-    run_steps(ctx, steps, Keyword.put(opts, :mode, :non_stream))
+    execute_plan_with_plan(
+      plan_id,
+      plan_version,
+      profile,
+      overrides,
+      input,
+      exec_meta,
+      opts |> Keyword.put(:mode, :non_stream)
+    )
   end
 
+  @doc """
+  Execute a plan (streaming). Requires :plan_id in opts.
+  Optional: :plan_version (integer or :latest, default :latest).
+  """
   @spec execute_plan_stream(
           profile :: term(),
           overrides :: map(),
@@ -61,38 +69,93 @@ defmodule AgentRuntime.Llm.PlanExecutor do
         ) :: result()
   def execute_plan_stream(profile, overrides, input, exec_meta, on_chunk, opts \\ [])
       when is_map(exec_meta) and is_function(on_chunk, 1) do
-    steps = Keyword.get(opts, :steps, @default_steps)
+    plan_id = Keyword.fetch!(opts, :plan_id)
+    plan_version = Keyword.get(opts, :plan_version, :latest)
 
-    trace_id = Map.get(exec_meta, "trace_id") || Map.get(exec_meta, :trace_id) || generate_trace_id()
+    execute_plan_with_plan(
+      plan_id,
+      plan_version,
+      profile,
+      overrides,
+      input,
+      exec_meta,
+      opts
+      |> Keyword.put(:mode, :stream)
+      |> Keyword.put(:on_chunk, on_chunk)
+    )
+  end
 
-    ctx = %PlanContext{
-      profile: profile,
-      overrides: overrides || %{},
-      input: input,
-      exec_meta: Map.put(exec_meta, "trace_id", trace_id)
-    }
+  @doc """
+  Low-level entrypoint:
+  - Loads plan from store (latest or specific version)
+  - Resolves steps to modules and validates contracts
+  - Injects plan_id/plan_version/trace_id into exec_meta
+  - Executes steps
+  """
+  @spec execute_plan_with_plan(
+          plan_id :: String.t(),
+          plan_version :: non_neg_integer() | :latest,
+          profile :: term(),
+          overrides :: map(),
+          input :: map(),
+          exec_meta :: map(),
+          keyword()
+        ) :: result()
+  def execute_plan_with_plan(
+        plan_id,
+        plan_version \\ :latest,
+        profile,
+        overrides,
+        input,
+        exec_meta,
+        opts \\ []
+      )
+      when is_binary(plan_id) and is_map(exec_meta) do
+    store = Store.impl!()
 
-    run_steps(ctx, steps, opts |> Keyword.put(:mode, :stream) |> Keyword.put(:on_chunk, on_chunk))
+    with {:ok, plan} <- load_plan(store, plan_id, plan_version),
+         {:ok, steps} <- Resolver.resolve_steps(plan) do
+      trace_id =
+        Map.get(exec_meta, "trace_id") ||
+          Map.get(exec_meta, :trace_id) ||
+          generate_trace_id()
+
+      exec_meta =
+        exec_meta
+        |> Map.put("trace_id", trace_id)
+        |> Map.put("plan_id", plan.id)
+        |> Map.put("plan_version", plan.version)
+
+      ctx = %PlanContext{
+        profile: profile,
+        overrides: overrides || %{},
+        input: input,
+        exec_meta: exec_meta
+      }
+
+      run_steps(ctx, steps, opts, plan)
+    end
   end
 
   # -----------------------
   # Internal
   # -----------------------
 
-  defp run_steps(%PlanContext{} = ctx, steps, opts) when is_list(steps) do
+  defp load_plan(store, plan_id, :latest), do: store.get_latest(plan_id)
+  defp load_plan(store, plan_id, version), do: store.get(plan_id, version)
+
+  defp run_steps(%PlanContext{} = ctx, steps, opts, plan) when is_list(steps) do
     trace_id = Map.get(ctx.exec_meta, "trace_id")
-    Logger.info("[PlanExecutor] Starting plan execution trace_id=#{trace_id} steps=#{length(steps)}")
+
+    Logger.info("[PlanExecutor] start trace_id=#{trace_id} steps=#{length(steps)}")
+    Logger.info("[PlanExecutor] plan=#{ctx.exec_meta["plan_id"]}:#{ctx.exec_meta["plan_version"]} trace_id=#{trace_id}")
 
     Enum.reduce_while(steps, {:cont, ctx}, fn step_mod, {:cont, ctx_acc} ->
       ensure_step!(step_mod)
 
-      # Determine phase name for this step
       phase = step_phase_name(step_mod)
-
-      # Create parent_run_id from previous step if available
       parent_run_id = get_last_run_id(ctx_acc)
 
-      # Update exec_meta with current phase and parent
       ctx_with_phase = %{
         ctx_acc
         | exec_meta:
@@ -101,17 +164,17 @@ defmodule AgentRuntime.Llm.PlanExecutor do
             |> maybe_put_parent_run_id(parent_run_id)
       }
 
-      try do
-        Logger.info("[PlanExecutor] Executing step=#{phase} parent_run_id=#{parent_run_id}")
+      step_kw = step_opts(step_mod, opts, plan)
 
-        case step_mod.run(ctx_with_phase, step_opts(step_mod, opts)) do
+      try do
+        Logger.info("[PlanExecutor] step=#{phase} parent_run_id=#{inspect(parent_run_id)}")
+
+        case step_mod.run(ctx_with_phase, step_kw) do
           {:cont, %PlanContext{} = ctx2} ->
-            # Step completed successfully, continue
             {:cont, {:cont, ctx2}}
 
           {:halt, result} ->
-            # Step decided to halt (either success or needs_clarification)
-            Logger.info("[PlanExecutor] Step #{phase} halted execution")
+            Logger.info("[PlanExecutor] halt at step=#{phase}")
             {:halt, result}
 
           other ->
@@ -119,17 +182,18 @@ defmodule AgentRuntime.Llm.PlanExecutor do
         end
       rescue
         e ->
-          Logger.error("[PlanExecutor] Step #{phase} crashed: #{Exception.message(e)}")
+          Logger.error("[PlanExecutor] crash at step=#{phase}: #{Exception.message(e)}")
           {:halt, {:error, {:step_crashed, step_mod, Exception.message(e)}}}
       catch
         kind, reason ->
-          Logger.error("[PlanExecutor] Step #{phase} threw: #{inspect({kind, reason})}")
+          Logger.error("[PlanExecutor] throw at step=#{phase}: #{inspect({kind, reason})}")
           {:halt, {:error, {:step_threw, step_mod, kind, reason}}}
       end
     end)
     |> case do
-      {:cont, {:cont, _ctx}} ->
-        {:error, :plan_did_not_halt}
+      {:cont, {:cont, last_ctx}} ->
+        last_phase = Map.get(last_ctx.exec_meta || %{}, "phase")
+        {:error, {:plan_did_not_halt, %{last_phase: last_phase}}}
 
       other ->
         other
@@ -148,27 +212,55 @@ defmodule AgentRuntime.Llm.PlanExecutor do
     :ok
   end
 
-  # Map step modules to phase names for RunSnapshot tracking
-  defp step_phase_name(AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStep), do: "assess_history"
-  defp step_phase_name(AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep), do: "assess_clarification"
-  defp step_phase_name(AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep), do: "retrieve_memory"
-  defp step_phase_name(AgentRuntime.Llm.Plan.Steps.ExecutePromptStep), do: "execute"
-  defp step_phase_name(other), do: "custom_#{inspect(other)}"
+  # Prefer stable, plan-friendly naming: use step_mod.name/0.
+  # Falls back to module name if name/0 returns unexpected.
+  defp step_phase_name(step_mod) do
+    case step_mod.name() do
+      name when is_binary(name) ->
+        trimmed_name = String.trim(name)
+        if byte_size(trimmed_name) > 0 do
+          trimmed_name
+        else
+          "custom_" <> Atom.to_string(step_mod)
+        end
 
-  # Extract the last run_id from debug trail for parent linking
+      _ ->
+        "custom_" <> Atom.to_string(step_mod)
+    end
+  end
+
+  # Extract the last run_id from debug trail for parent linking.
+  # Your PlanContext.add_debug stores entries as %{step: ..., data: %{...}}.
   defp get_last_run_id(%PlanContext{debug: debug}) when is_list(debug) do
     debug
     |> Enum.reverse()
-    |> Enum.find_value(fn entry ->
-      Map.get(entry, :run_id) || get_in(entry, [:data, "run_id"]) || get_in(entry, [:data, :run_id])
+    |> Enum.find_value(fn
+      %{data: %{"run_id" => run_id}} when is_binary(run_id) and run_id != "" -> run_id
+      %{data: %{run_id: run_id}} when is_binary(run_id) and run_id != "" -> run_id
+      _ -> nil
     end)
   end
+
   defp get_last_run_id(_), do: nil
 
   defp maybe_put_parent_run_id(meta, nil), do: meta
   defp maybe_put_parent_run_id(meta, parent_run_id), do: Map.put(meta, "parent_run_id", parent_run_id)
 
-  defp step_opts(step_mod, opts) do
+  # Effective opts = base step opts (including infra injections) + plan per-step policies
+  defp step_opts(step_mod, opts, plan) do
+    base = step_opts_base(step_mod, opts)
+
+    policies = plan.policies || %{}
+    step_policy = get_in(policies, ["steps", step_mod.name()]) || %{}
+
+    Keyword.merge(base, Map.to_list(step_policy))
+  end
+
+  # Base options:
+  # - per-step base opts: opts[:step_opts][StepModule] (keyword)
+  # - injected infra: assessor_profile/overrides, memory_store
+  # - Execute step receives streaming flags
+  defp step_opts_base(step_mod, opts) do
     per_step = Keyword.get(opts, :step_opts, %{})
     base = Map.get(per_step, step_mod, [])
 
@@ -176,7 +268,7 @@ defmodule AgentRuntime.Llm.PlanExecutor do
       base
       |> maybe_put(:assessor_profile, Keyword.get(opts, :assessor_profile))
       |> maybe_put(:assessor_overrides, Keyword.get(opts, :assessor_overrides))
-      |> maybe_put(:memory_store, Keyword.get(opts, :memory_store))  # ← ΑΥΤΟ
+      |> maybe_put(:memory_store, Keyword.get(opts, :memory_store))
 
     case step_mod do
       AgentRuntime.Llm.Plan.Steps.ExecutePromptStep ->
