@@ -6,6 +6,8 @@ defmodule AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep do
   alias AgentRuntime.Llm.Plan.StepUtils
   alias AgentRuntime.Llm.Executor
 
+
+
   @impl true
   def name, do: "assess_need_for_clarification"
 
@@ -32,13 +34,36 @@ defmodule AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep do
       user_prompt = StepUtils.last_user_prompt(ctx)
       system_prompt = build_system_prompt()
 
+      aug = normalize_chat_messages(ctx.augmented_messages || [])
+
+      messages =
+        [%{role: :system, content: system_prompt}] ++
+        aug ++
+        [%{role: :user, content: user_prompt}]
+
       llm_input = %{
         type: :chat,
-        messages: [
-          %{role: :system, content: system_prompt},
-          %{role: :user, content: user_prompt}
-        ]
+        messages: messages
       }
+
+      roles =
+        messages
+        |> Enum.map(fn
+          %{role: r} -> r
+          %{"role" => r} -> r
+          _ -> :unknown
+        end)
+
+      has_user =
+        Enum.any?(messages, fn
+          %{role: :user} -> true
+          %{role: "user"} -> true
+          %{"role" => "user"} -> true
+          _ -> false
+        end)
+
+      Logger.debug("[execute] llm_input messages_count=#{length(messages)} roles=#{inspect(roles)} has_user=#{has_user} messages=#{inspect(llm_input)}")
+
 
       # Execute with current phase from exec_meta (will be "assess_clarification")
       case Executor.execute(assessor_profile, overrides, llm_input, ctx.exec_meta) do
@@ -99,6 +124,34 @@ defmodule AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep do
     end
   end
 
+  defp normalize_chat_messages(messages) when is_list(messages) do
+    Enum.map(messages, &normalize_chat_message/1)
+  end
+
+  defp normalize_chat_message(%{role: _r, content: _c} = m), do: m
+
+  defp normalize_chat_message(%{"role" => r, "content" => c}) do
+    %{
+      role: normalize_role(r),
+      content: c
+    }
+  end
+
+  defp normalize_chat_message(other) do
+    # Defensive: keep something usable for debugging instead of crashing.
+    %{
+      role: :system,
+      content: "Unrecognized augmented message: " <> inspect(other)
+    }
+  end
+
+  defp normalize_role(r) when is_atom(r), do: r
+  defp normalize_role("system"), do: :system
+  defp normalize_role("user"), do: :user
+  defp normalize_role("assistant"), do: :assistant
+  defp normalize_role(_), do: :system
+
+
   defp build_system_prompt do
     """
     You are deciding whether a user's request is clear enough to execute.
@@ -111,10 +164,39 @@ defmodule AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep do
       "question": string | null
     }
 
-    Rules:
-    - If the request is ambiguous, missing goals, or unclear -> needs_clarification = true
-    - If needs_clarification = false -> question MUST be null
-    - Keep the question short and specific.
+    Core rules:
+    - Default to needs_clarification = false. Ask for clarification ONLY as a last resort.
+    - If the request is answerable with reasonable assumptions, proceed (needs_clarification=false).
+    - If the user message is empty or nonsensical, ask one short clarification question.
+
+    Context rules (IMPORTANT):
+    - You may be given additional context messages (e.g., retrieved memory or working context).
+      If such context is present, you MUST use it to resolve references (it/that/this/they) and follow-ups.
+    - If the user asks a follow-up, assume it refers to the immediately prior topic in the provided context.
+    - Do NOT ask "what do you mean by it?" if the provided context gives a plausible antecedent.
+
+    Comparison questions:
+    - If the user asks "How does X compare with Y?" and context provides info about X,
+      you can answer even if Y is not in the context - the assistant knows about Y.
+    - Only ask for clarification if BOTH X and Y are unclear.
+
+    When to ask clarification:
+    - Ask clarification only if you genuinely cannot identify what the user is asking even after using the provided context.
+    - If clarification is needed, ask exactly ONE short, specific question.
+
+    Output rules:
+    - If needs_clarification = false -> question MUST be null.
+    - If needs_clarification = true  -> question MUST be a single short question.
+
+    Examples:
+    - "how can I call you?" -> needs_clarification: false
+    - "what do you prefer?" -> needs_clarification: false (use context)
+    - "yes" -> needs_clarification: false (use context)
+    - "you choose" -> needs_clarification: false (use context)
+    - "How does that compare with SSE?" -> needs_clarification: false (context has "that", SSE is known)
+    - "" -> needs_clarification: true, question: "What would you like to know?"
+    - "I need help with..." -> needs_clarification: true, question: "What specifically do you need help with?"
     """
   end
+
 end

@@ -19,14 +19,79 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
   end
 
   def safe_json_decode(text) when is_binary(text) do
-    with {:ok, map} when is_map(map) <- Jason.decode(text) do
-      map
-    else
+    text
+    |> extract_json_object()
+    |> decode_json_object()
+  end
+
+  def safe_json_decode(_), do: %{}
+
+  defp extract_json_object(text) do
+    text = String.trim(text)
+
+    # Προσπάθησε να βρεις JSON με διάφορους τρόπους
+    cond do
+      # 1. Αν είναι ήδη JSON
+      String.starts_with?(text, "{") and String.ends_with?(text, "}") ->
+        text
+
+      # 2. Ψάξε για ```json ... ```
+      String.contains?(text, "```json") ->
+        case Regex.run(~r/```json\s*(\{.*?\})\s*```/s, text) do
+          [_, json] -> String.trim(json)
+          _ -> find_last_json_block(text)
+        end
+
+      # 3. Βρες το τελευταίο {...}
+      true ->
+        find_last_json_block(text)
+    end
+  end
+
+  defp find_last_json_block(text) do
+    # Απλή προσέγγιση: βρες το τελευταίο { και το αντίστοιχο }
+    case :binary.matches(text, "{") do
+      [] -> nil
+      positions ->
+        # Πάρε το τελευταίο {
+        {last_open, _} = List.last(positions)
+
+        # Προσπάθησε να βρεις balanced }
+        try_extract_from_position(text, last_open)
+    end
+  end
+
+  defp try_extract_from_position(text, start_pos) do
+    substring = String.slice(text, start_pos..-1//1)
+
+    # Βρες το matching closing brace
+    case find_matching_brace(substring, 0, 0) do
+      nil -> nil
+      end_pos -> String.slice(substring, 0..end_pos)
+    end
+  end
+
+  defp find_matching_brace(<<>>, _pos, _depth), do: nil
+  defp find_matching_brace(<<"{", rest::binary>>, pos, depth) do
+    find_matching_brace(rest, pos + 1, depth + 1)
+  end
+  defp find_matching_brace(<<"}", _rest::binary>>, pos, 1), do: pos
+  defp find_matching_brace(<<"}", rest::binary>>, pos, depth) when depth > 1 do
+    find_matching_brace(rest, pos + 1, depth - 1)
+  end
+  defp find_matching_brace(<<_char, rest::binary>>, pos, depth) do
+    find_matching_brace(rest, pos + 1, depth)
+  end
+
+  defp decode_json_object(nil), do: %{}
+
+  defp decode_json_object(json) do
+    case Jason.decode(json) do
+      {:ok, map} when is_map(map) -> map
       _ -> %{}
     end
   end
 
-  def safe_json_decode(_), do: %{}
 
   def boolean(map, key, default \\ false) when is_map(map) do
     case Map.get(map, key) do

@@ -67,8 +67,8 @@ defmodule AgentWebWeb.PlanExecuteLive do
     trace_id_param = Map.get(params, "trace_id", "") |> to_string() |> String.trim()
     trace_id = if trace_id_param == "", do: socket.assigns.trace_id, else: trace_id_param
 
-    messages0 = Map.get(socket.assigns, :messages, [])
-    last_run_id = Map.get(socket.assigns, :last_run_id, nil)
+    # messages0 = Map.get(socket.assigns, :messages, [])
+    # last_run_id = Map.get(socket.assigns, :last_run_id, nil)
 
     socket =
       socket
@@ -82,11 +82,16 @@ defmodule AgentWebWeb.PlanExecuteLive do
       if prompt == "" do
         {:noreply, assign(socket, :loading, false)}
       else
-        messages = messages0 |> append_msg("user", prompt)
+        # messages = messages0 |> append_msg("user", prompt)
+        new_messages = socket.assigns.messages |> append_msg("user", prompt)
+
+        # current_message = [] |> append_msg("user", prompt)
+
+
 
         input = %{
           "type" => "chat",
-          "messages" => messages
+          "messages" => [%{"role" => "user", "content" => prompt}]
         }
 
         payload =
@@ -96,12 +101,13 @@ defmodule AgentWebWeb.PlanExecuteLive do
             "overrides" => %{},
             "conversation_id" => socket.assigns.conversation_id
           }
-          |> maybe_put("parent_run_id", last_run_id)
+          |> maybe_put("parent_run_id", socket.assigns.last_run_id)
+          |> maybe_put("trace_id", trace_id)  # Προσθήκη trace_id
 
 
         {:noreply,
          socket
-         |> assign(:messages, messages)
+         |> assign(:messages, new_messages)
          |> assign(:streaming, true)
          |> assign(:stream_buffer, "")
          |> assign(:prompt, "")
@@ -185,7 +191,10 @@ defmodule AgentWebWeb.PlanExecuteLive do
      |> assign(:result, %{
        status: "needs_clarification",
        question: question,
-       trace_id: trace_id
+       trace_id: trace_id,
+       run_id: socket.assigns.last_run_id || Ecto.UUID.generate(),
+       latency_ms: 0,
+       usage: %{}
      })}
   end
 

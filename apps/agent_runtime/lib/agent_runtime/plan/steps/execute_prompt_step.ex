@@ -13,13 +13,11 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
   def run(%PlanContext{} = ctx, opts) do
     mode = Keyword.get(opts, :mode, :non_stream)
 
-    final_messages = PlanContext.final_messages(ctx)
-    input = normalize_input(ctx.input, final_messages)
+    # Build complete message list with context
+    messages = build_complete_messages(ctx)
+    input = normalize_input(ctx.input, messages)
 
     conversation_id = Map.get(ctx.exec_meta || %{}, "conversation_id")
-
-    # If you don’t have auth yet, keep a stable dev user id.
-    # Later: derive from ctx.exec_meta or session/user claims.
     user_id = Map.get(ctx.exec_meta || %{}, "user_id") || "dev"
 
     # Persist user message only if conversation_id exists/valid
@@ -30,7 +28,7 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
 
           case apply(module, :ensure_conversation!, [conv_id, user_id]) do
             :ok ->
-              user_text = extract_latest_user_text(final_messages, input)
+              user_text = extract_latest_user_text(messages, input)
 
               case apply(module, :append_message!, [conv_id, "user", user_text, nil]) do
                 {:ok, msg} -> {msg, user_text}
@@ -76,7 +74,6 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
 
         maybe_persist_and_ingest(conversation_id, user_id, user_turn, assistant_text, result)
 
-
         {:halt, result}
 
       _ ->
@@ -88,11 +85,97 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
     end
   end
 
+  # NEW HELPER - Build complete message list
+  defp build_complete_messages(%PlanContext{} = ctx) do
+    # 1. Base system prompt
+    base_system = %{
+      role: :system,
+      content: """
+      You are a helpful AI assistant. Answer questions clearly and accurately.
+      When context from previous conversation is provided, use it to understand
+      references like "that", "it", etc. You may use your general knowledge
+      to expand on the provided context.
+      """
+    }
+
+    messages = [base_system]
+
+    # 2. Add augmented context (from memory retrieval) if present
+    messages =
+      case ctx.augmented_messages do
+        nil ->
+          messages
+        [] ->
+          messages
+        aug when is_list(aug) ->
+          # Normalize and add augmented messages
+          augmented = Enum.map(aug, fn msg ->
+            case msg do
+              %{"role" => r, "content" => c} ->
+                %{role: normalize_role(r), content: c}
+              %{role: r, content: c} ->
+                %{role: normalize_role(r), content: c}
+              _ ->
+                msg
+            end
+          end)
+          messages ++ augmented
+      end
+
+    # 3. Add the current user message
+    user_prompt = get_user_prompt_from_context(ctx)
+
+    if user_prompt && String.trim(user_prompt) != "" do
+      messages ++ [%{role: :user, content: user_prompt}]
+    else
+      Logger.warning("[ExecutePromptStep] No user prompt found in context")
+      messages
+    end
+  end
+
+  # Extract user prompt from PlanContext
+  defp get_user_prompt_from_context(%PlanContext{input: input}) do
+    case input do
+      # Chat format with messages list
+      %{"type" => "chat", "messages" => msgs} when is_list(msgs) ->
+        find_last_user_message(msgs)
+
+      %{type: :chat, messages: msgs} when is_list(msgs) ->
+        find_last_user_message(msgs)
+
+      # Completion format
+      %{"type" => "completion", "prompt" => prompt} ->
+        to_string(prompt)
+
+      %{type: :completion, prompt: prompt} ->
+        to_string(prompt)
+
+      # Fallback
+      _ ->
+        nil
+    end
+  end
+
+  defp find_last_user_message(msgs) when is_list(msgs) do
+    msgs
+    |> Enum.reverse()
+    |> Enum.find_value(fn msg ->
+      case msg do
+        %{"role" => "user", "content" => c} -> c
+        %{role: :user, content: c} -> c
+        %{"role" => :user, "content" => c} -> c
+        %{role: "user", content: c} -> c
+        _ -> nil
+      end
+    end)
+  end
+
+  defp find_last_user_message(_), do: nil
   # -----------------------
   # Persistence + ingestion
   # -----------------------
 
-  defp maybe_persist_and_ingest(conversation_id, user_id, {user_msg, user_text}, assistant_text, result) do
+  defp maybe_persist_and_ingest(conversation_id, user_id, {user_msg, _user_text}, assistant_text, _result) do
     case {safe_uuid(conversation_id), user_msg} do
       {{:ok, conv_id}, %{id: _}} ->
         module = conversations_module()
@@ -176,6 +259,8 @@ defmodule AgentRuntime.Llm.Plan.Steps.ExecutePromptStep do
           |> to_string()
     end
   end
+
+
 
   # Very defensive extractor (adjust later once you confirm Executor’s exact return shape)
   defp extract_assistant_text_from_result({:ok, %{text: t}}), do: to_string(t)

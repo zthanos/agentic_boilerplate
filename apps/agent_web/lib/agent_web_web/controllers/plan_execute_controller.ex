@@ -35,7 +35,8 @@ defmodule AgentWebWeb.PlanExecuteController do
             overrides,
             runtime_input,
             exec_meta,
-            on_chunk
+            on_chunk,
+            memory_store: AgentWeb.Memory.Store
           )
         end)
       else

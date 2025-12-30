@@ -12,17 +12,24 @@ defmodule AgentRuntime.Llm.PlanExecutor do
   """
   require Logger
   alias AgentRuntime.Llm.Plan.PlanContext
-  # alias AgentCore.Llm.RunSnapshot
+
 
   @default_steps [
     AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStep,
-    AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep,
     AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep,
+    AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep,
     AgentRuntime.Llm.Plan.Steps.ExecutePromptStep
   ]
 
+  @typedoc """
+  Result of executing a plan.
+
+  - `{:ok, map}` – successful low-level executor result (wrapped response, run_id, etc)
+  - `{:ok, %{mode: :needs_clarification, ...}}` – plan decided it needs a clarification question
+  - `{:error, term}` – any error from steps or executor
+  """
   @type result ::
-          AgentRuntime.Llm.Executor.result()
+          {:ok, map()}
           | {:ok, %{mode: :needs_clarification, trace_id: String.t(), question: String.t()}}
           | {:error, term()}
 
@@ -160,6 +167,7 @@ defmodule AgentRuntime.Llm.PlanExecutor do
 
   defp maybe_put_parent_run_id(meta, nil), do: meta
   defp maybe_put_parent_run_id(meta, parent_run_id), do: Map.put(meta, "parent_run_id", parent_run_id)
+
   defp step_opts(step_mod, opts) do
     per_step = Keyword.get(opts, :step_opts, %{})
     base = Map.get(per_step, step_mod, [])
@@ -168,19 +176,16 @@ defmodule AgentRuntime.Llm.PlanExecutor do
       base
       |> maybe_put(:assessor_profile, Keyword.get(opts, :assessor_profile))
       |> maybe_put(:assessor_overrides, Keyword.get(opts, :assessor_overrides))
+      |> maybe_put(:memory_store, Keyword.get(opts, :memory_store))  # ← ΑΥΤΟ
 
     case step_mod do
       AgentRuntime.Llm.Plan.Steps.ExecutePromptStep ->
         Keyword.merge(base, Keyword.take(opts, [:mode, :on_chunk]))
 
-      AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep ->
-        Keyword.put_new(base, :memory_store, AgentWeb.Memory.Store)
-
       _ ->
         base
     end
   end
-
 
   defp maybe_put(keyword, _k, nil), do: keyword
   defp maybe_put(keyword, k, v), do: Keyword.put_new(keyword, k, v)
