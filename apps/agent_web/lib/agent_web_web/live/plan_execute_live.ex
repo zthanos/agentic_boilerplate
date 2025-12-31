@@ -1,10 +1,14 @@
 defmodule AgentWebWeb.PlanExecuteLive do
   use AgentWebWeb, :live_view
-  alias AgentWeb.Llm.ProfileStoreEcto
 
-  @default_profile_id "req_llm"
+  # In your LiveView or component
+  import AgentWebWeb.MessagesComponent
+  import AgentWebWeb.ResultsComponent
+
+  alias AgentWeb.Llm.ProfileStoreEcto
   alias AgentWeb.Llm.AgentStoreEcto
 
+  @default_profile_id "req_llm"
   @stream_endpoint "/api/agents/execute/stream"
   @default_agent_id "arch_assistant"
 

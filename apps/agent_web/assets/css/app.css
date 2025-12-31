@@ -103,3 +103,71 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+
+/* Custom markdown styling */
+.prose pre {
+  @apply rounded-box border border-base-300;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0;
+}
+
+.prose code:not(pre code) {
+  @apply bg-base-300 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary bg-base-200/50 not-italic px-4 py-2;
+}
+
+.prose table {
+  @apply rounded-box overflow-hidden border border-base-300;
+}
+
+.prose th {
+  @apply border-b border-base-300 bg-base-200;
+}
+
+.prose td {
+  @apply border-b border-base-300;
+}
+
+.prose a {
+  @apply font-medium hover:text-primary/90 transition-colors;
+}
+
+/* Mockup code blocks */
+.mockup-code {
+  @apply my-4;
+}
+
+.mockup-code pre {
+  @apply m-0 p-0;
+}
+
+.mockup-code pre code {
+  @apply p-4;
+}
+
+/* Message content specific */
+.message-content .prose {
+  @apply max-w-none;
+}
+
+/* Code block line numbers (optional) */
+.prose pre {
+  counter-reset: line;
+}
+
+.prose pre code .line {
+  counter-increment: line;
+  display: block;
+}
+
+.prose pre code .line::before {
+  content: counter(line);
+  @apply text-base-content/30 mr-4 w-4 inline-block text-right;
+  user-select: none;
+}

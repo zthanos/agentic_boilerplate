@@ -11,6 +11,58 @@ import topbar from "../vendor/topbar"
 
 const Hooks = {}
 
+
+Hooks.AutoScroll = {
+  mounted() {
+    this.scrollToBottom();
+    this.observer = new MutationObserver(() => {
+      if (this.shouldAutoScroll()) {
+        this.scrollToBottom();
+      }
+    });
+    
+    this.observer.observe(this.el, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+
+    // Scroll on manual scroll near bottom
+    this.el.addEventListener('scroll', () => {
+      this.userScrolled = this.el.scrollTop < (this.el.scrollHeight - this.el.clientHeight - 100);
+    });
+  },
+
+  updated() {
+    if (this.shouldAutoScroll()) {
+      this.scrollToBottom();
+    }
+  },
+
+  destroyed() {
+    if (this.observer) {
+      this.observer.disconnect();
+    }
+  },
+
+  scrollToBottom() {
+    requestAnimationFrame(() => {
+      this.el.scrollTop = this.el.scrollHeight;
+      this.userScrolled = false;
+    });
+  },
+
+  shouldAutoScroll() {
+    // Auto scroll if user is near the bottom (within 100px) or hasn't manually scrolled up
+    const threshold = 100;
+    const position = this.el.scrollTop + this.el.clientHeight;
+    const bottom = this.el.scrollHeight;
+    return !this.userScrolled || (bottom - position < threshold);
+  }
+};
+
+
+
 Hooks.LlmSSE = {
   mounted() {
     this.reader = null
