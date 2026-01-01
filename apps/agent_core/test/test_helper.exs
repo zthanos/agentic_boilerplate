@@ -1,2 +1,2 @@
-ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(AgentCore.Repo, :manual)
+# apps/agent_core/test/test_helper.exs
+# ExUnit.start()

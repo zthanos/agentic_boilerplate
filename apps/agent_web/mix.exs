@@ -9,7 +9,7 @@ defmodule AgentWeb.MixProject do
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
-      elixir: "~> 1.15",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -72,7 +72,10 @@ defmodule AgentWeb.MixProject do
       {:bandit, "~> 1.5"},
       {:open_api_spex, "~> 3.21"},
       {:earmark, "~> 1.4"},
-      {:earmark_parser, "~> 1.4"}
+      {:earmark_parser, "~> 1.4"},
+      {:ex_machina, "~> 2.8", only: :test},
+      {:mox, "~> 1.2", only: :test},
+      {:stream_data, "~> 1.0", only: :test}
 
     ]
   end

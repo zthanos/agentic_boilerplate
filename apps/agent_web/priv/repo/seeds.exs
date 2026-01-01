@@ -36,8 +36,6 @@ case Profiles.put(req_llm) do
   {:error, err} -> IO.inspect(err, label: "Failed to seed req_llm")
 end
 
-
-
 embeddings_nomic_v15 =
   %AgentCore.Llm.LLMProfile{
     id: "embeddings_nomic_v15",
@@ -65,7 +63,91 @@ plan =
     version: 1,
     name: "History RAG",
     policies: %{
-      "retrieval" => %{"top_k" => 8, "min_score" => 0.78}
+      "retrieval" => %{"top_k" => 8, "min_score" => 0.78},
+      "steps" => %{
+        "assess_need_for_history" => %{
+          "system_prompt" => """
+          Analyze if this user message needs historical context from the conversation.
+
+          IMPORTANT: This conversation already has history. Previous messages exist in the database.
+          Your job is to decide what search query to use to retrieve that history.
+
+          Return ONLY valid JSON:
+          {
+          "query": string | null
+          }
+
+          Decision rules:
+          1. If the message is a greeting or introduction (first message) → null
+          2. If the message asks about or references something previously discussed → MUST return query
+          3. If the message continues a topic, asks follow-up questions → MUST return query
+          4. If unsure, return a query (better to have context than miss it)
+          5. Only return null for completely standalone, context-free messages
+
+          Query guidelines:
+          - Extract key nouns, entities, topics
+          - 3-8 words max
+          - No quotes, just plain text
+          - Focus on what would match in vector search
+
+          Examples:
+          Input: "What's my job?"
+          Output: {"query": "user's job occupation"}
+
+          Input: "Tell me about yourself"
+          Output: {"query": "assistant introduction description"}
+
+          Input: "Hello"
+          Output: {"query": null}
+          """
+        },
+        "assess_need_for_clarification" => %{
+          "system_prompt" => """
+          You are deciding whether a user's request is clear enough to execute.
+
+          Return ONLY valid JSON.
+
+          Schema:
+          {
+          "needs_clarification": boolean,
+          "question": string | null
+          }
+
+          Core rules:
+          - Default to needs_clarification = false. Ask for clarification ONLY as a last resort.
+          - If the request is answerable with reasonable assumptions, proceed (needs_clarification=false).
+          - If the user message is empty or nonsensical, ask one short clarification question.
+
+          Context rules (IMPORTANT):
+          - You may be given additional context messages (e.g., retrieved memory or working context).
+          If such context is present, you MUST use it to resolve references (it/that/this/they) and follow-ups.
+          - If the user asks a follow-up, assume it refers to the immediately prior topic in the provided context.
+          - Do NOT ask "what do you mean by it?" if the provided context gives a plausible antecedent.
+
+          Comparison questions:
+          - If the user asks "How does X compare with Y?" and context provides info about X,
+          you can answer even if Y is not in the context - the assistant knows about Y.
+          - Only ask for clarification if BOTH X and Y are unclear.
+
+          When to ask clarification:
+          - Ask clarification only if you genuinely cannot identify what the user is asking even after using the provided context.
+          - If clarification is needed, ask exactly ONE short, specific question.
+
+          Output rules:
+          - If needs_clarification = false -> question MUST be null.
+          - If needs_clarification = true  -> question MUST be a single short question.
+
+          Examples:
+          - "how can I call you?" -> needs_clarification: false
+          - "what do you prefer?" -> needs_clarification: false (use context)
+          - "yes" -> needs_clarification: false (use context)
+          - "you choose" -> needs_clarification: false (use context)
+          - "How does that compare with SSE?" -> needs_clarification: false (context has "that", SSE is known)
+          - "" -> needs_clarification: true, question: "What would you like to know?"
+          - "I need help with..." -> needs_clarification: true, question: "What specifically do you need help with?"
+          """
+        }
+      }
     },
     steps: [
       "AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStep",
@@ -82,9 +164,6 @@ case PlanStoreEcto.get(plan.id, plan.version) do
   {:error, :not_found} -> PlanStoreEcto.put(plan)
 end
 
-
-
-
 agent =
   AgentDef.new(%{
     id: "arch_assistant",
@@ -96,7 +175,8 @@ agent =
       "assessor_profile_id" => "req_llm"
     },
     prompts: %{
-      "system" => "You are a policy-driven Architect Assistant Agent. Follow the plan and policies strictly."
+      "system" =>
+        "You are a policy-driven Architect Assistant Agent. Follow the plan and policies strictly."
     },
     policies: %{}
   })

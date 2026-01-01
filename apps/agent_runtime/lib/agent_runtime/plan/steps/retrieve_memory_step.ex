@@ -4,24 +4,26 @@ defmodule AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep do
 
   alias AgentRuntime.Llm.Plan.PlanContext
   alias AgentRuntime.Llm.Executor
-  @default_threshold 0.38
 
+  @default_threshold 0.38
   @top_k 6
   @embeddings_profile_id "embeddings_nomic_v15"
 
-
   @impl true
   def name, do: "retrieve_memory"
-  # Στο retrieve_memory_step.ex, αντικατάσταση του τρέχοντος run/2:
 
   @impl true
   def run(%PlanContext{} = ctx, opts) do
-    query_text = get_in(ctx.decisions || %{}, [:history_query])
-    conversation_id = Map.get(ctx.exec_meta || %{}, "conversation_id")
+    executor = Keyword.get(opts, :executor, Executor)
     memory_store = Keyword.get(opts, :memory_store)
 
-    top_k = Keyword.get(opts, :top_k, @top_k)
-    threshold = Keyword.get(opts, :similarity_threshold, @default_threshold)
+    query_text = get_in(ctx.decisions || %{}, [:history_query])
+    conversation_id = Map.get(ctx.exec_meta || %{}, "conversation_id")
+
+    top_k = Keyword.get(opts, :top_k, Keyword.get(opts, :retrieval_top_k, @top_k))
+
+    threshold =
+      Keyword.get(opts, :similarity_threshold, Keyword.get(opts, :min_score, @default_threshold))
 
     Logger.info(
       "[plan] retrieve_memory starting: query=#{inspect(query_text)}, conv_id=#{inspect(conversation_id)}, store?=#{not is_nil(memory_store)}"
@@ -68,16 +70,31 @@ defmodule AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep do
         try do
           Logger.info("[plan] creating embedding for query: #{inspect(query_text)}")
 
-          with {:ok, embedding} <-
-                 Executor.embed(profile_id: @embeddings_profile_id, input: query_text) do
+          # IMPORTANT:
+          # Use behaviour signature embed/4 (binary, map, map, map)
+          embed_profile = %{"id" => @embeddings_profile_id}
+          overrides = ctx.overrides || %{}
+          exec_meta = ctx.exec_meta || %{}
+
+          with {:ok, embedding} <- executor.embed(query_text, embed_profile, overrides, exec_meta) do
             Logger.info("[plan] embedding created, length: #{length(embedding)}")
 
-            results = memory_store.search(conversation_id, embedding, top_k)
+            results =
+              case call_search(memory_store, conversation_id, embedding, top_k) do
+                {:ok, chunks} when is_list(chunks) -> chunks
+                chunks when is_list(chunks) -> chunks
+                other -> raise "memory_store.search returned unexpected: #{inspect(other)}"
+              end
+
             Logger.info("[plan] search returned #{length(results)} results")
-            # Προσθήκη chunk preview:
+
             Enum.each(Enum.take(results, 3), fn chunk ->
-              preview = String.slice(chunk.text, 0, 50) <> "..."
-              Logger.info("[plan] Chunk preview: #{preview} score: #{chunk.score}")
+              preview =
+                chunk.text
+                |> to_string()
+                |> String.slice(0, 50)
+
+              Logger.info("[plan] Chunk preview: #{preview}... score: #{chunk.score}")
             end)
 
             max_score =
@@ -85,7 +102,7 @@ defmodule AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep do
               |> Enum.map(& &1.score)
               |> Enum.max(fn -> 0.0 end)
 
-            selected = results |> Enum.filter(&(&1.score >= threshold))
+            selected = Enum.filter(results, &(&1.score >= threshold))
 
             Logger.info(
               "[plan] selected #{length(selected)} chunks above threshold #{threshold}, max_score=#{max_score}"
@@ -117,12 +134,12 @@ defmodule AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep do
                })}
 
             other ->
-              Logger.error("[plan] unexpected result from embedding/search: #{inspect(other)}")
+              Logger.error("[plan] unexpected result from embedding: #{inspect(other)}")
 
               {:cont,
                PlanContext.add_debug(ctx, name(), %{
                  "skipped" => true,
-                 "reason" => "embed_failed_or_search_failed",
+                 "reason" => "embed_failed",
                  "details" => inspect(other)
                })}
           end
@@ -141,14 +158,32 @@ defmodule AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep do
     end
   end
 
+  # Supports either search/3 that returns {:ok, list} or list
+  defp call_search(memory_store, conversation_id, embedding, top_k) do
+    cond do
+      function_exported?(memory_store, :search, 3) ->
+        memory_store.search(conversation_id, embedding, top_k)
+
+      function_exported?(memory_store, :search, 4) ->
+        # In case your store expects opts map/kw
+        memory_store.search(conversation_id, embedding, top_k, %{})
+
+      true ->
+        raise "memory_store does not implement search/3 or search/4"
+    end
+  end
+
   defp maybe_inject(ctx, []), do: ctx
 
+  # RESTORE injection into augmented_messages (regression fix)
   defp maybe_inject(ctx, selected) do
     content =
       selected
-      |> Enum.map_join("\n\n", & &1.text)
+      |> Enum.map_join("\n\n", fn chunk -> to_string(chunk.text) end)
 
-    PlanContext.add_augmented_message(ctx, %{
+    ctx
+    |> PlanContext.put_decision(:retrieved_memory, selected)
+    |> PlanContext.add_augmented_message(%{
       "role" => "system",
       "content" =>
         ("The following information was retrieved from prior conversation context.\n" <>

@@ -58,6 +58,7 @@ defmodule AgentWebWeb.PlanExecuteLive do
        |> assign(:error, nil)
        |> assign(:streaming, false)
        |> assign(:stream_buffer, "")
+       |> assign(:show_results_modal, false)
        |> assign(:conversations, [%{id: conversation_id, name: nil}])}
     else
       :error ->
@@ -66,6 +67,11 @@ defmodule AgentWebWeb.PlanExecuteLive do
          |> put_flash(:error, "Invalid conversation id")
          |> push_navigate(to: "/")}
     end
+  end
+
+  @impl true
+  def handle_event("toggle_results_modal", _params, socket) do
+    {:noreply, assign(socket, :show_results_modal, !socket.assigns.show_results_modal)}
   end
 
   @impl true
@@ -255,6 +261,16 @@ defmodule AgentWebWeb.PlanExecuteLive do
     {:noreply, assign(socket, :agent_id, if(valid?, do: agent_id, else: socket.assigns.agent_id))}
   end
 
+  @impl true
+  def handle_event("open_results_modal", _params, socket) do
+    {:noreply, assign(socket, :show_results_modal, true)}
+  end
+
+  @impl true
+  def handle_event("close_results_modal", _params, socket) do
+    {:noreply, assign(socket, :show_results_modal, false)}
+  end
+
   # --- helpers ---
 
   defp append_msg(messages, role, content) do
@@ -276,40 +292,40 @@ defmodule AgentWebWeb.PlanExecuteLive do
   # defp blank_to_nil(nil), do: nil
   # defp blank_to_nil(v), do: v
 
-  defp bubble_class("user"), do: "p-4 rounded-xl bg-slate-800 border border-slate-700"
+  # defp bubble_class("user"), do: "p-4 rounded-xl bg-slate-800 border border-slate-700"
 
-  defp bubble_class("assistant"),
-    do: "p-4 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700"
+  # defp bubble_class("assistant"),
+  #   do: "p-4 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700"
 
-  defp bubble_class("system"), do: "p-4 rounded-xl bg-blue-900/20 border border-blue-800/40"
-  defp bubble_class(_), do: "p-4 rounded-xl bg-slate-800 border border-slate-700"
+  # defp bubble_class("system"), do: "p-4 rounded-xl bg-blue-900/20 border border-blue-800/40"
+  # defp bubble_class(_), do: "p-4 rounded-xl bg-slate-800 border border-slate-700"
 
-  defp role_icon("user"), do: "👤"
-  defp role_icon("assistant"), do: "🤖"
-  defp role_icon("system"), do: "⚙️"
-  defp role_icon(_), do: "💬"
+  # defp role_icon("user"), do: "👤"
+  # defp role_icon("assistant"), do: "🤖"
+  # defp role_icon("system"), do: "⚙️"
+  # defp role_icon(_), do: "💬"
 
-  defp role_icon_class("user"),
-    do: "w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"
+  # defp role_icon_class("user"),
+  #   do: "w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"
 
-  defp role_icon_class("assistant"),
-    do:
-      "w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center"
+  # defp role_icon_class("assistant"),
+  #   do:
+  #     "w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center"
 
-  defp role_icon_class("system"),
-    do: "w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center"
+  # defp role_icon_class("system"),
+  #   do: "w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center"
 
-  defp role_icon_class(_),
-    do: "w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center"
+  # defp role_icon_class(_),
+  #   do: "w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center"
 
-  defp status_badge_class("completed"),
-    do: "px-3 py-1 text-xs rounded-full bg-green-900/30 text-green-400"
+  # defp status_badge_class("completed"),
+  #   do: "px-3 py-1 text-xs rounded-full bg-green-900/30 text-green-400"
 
-  defp status_badge_class("failed"),
-    do: "px-3 py-1 text-xs rounded-full bg-red-900/30 text-red-400"
+  # defp status_badge_class("failed"),
+  #   do: "px-3 py-1 text-xs rounded-full bg-red-900/30 text-red-400"
 
-  defp status_badge_class("running"),
-    do: "px-3 py-1 text-xs rounded-full bg-yellow-900/30 text-yellow-400"
+  # defp status_badge_class("running"),
+  #   do: "px-3 py-1 text-xs rounded-full bg-yellow-900/30 text-yellow-400"
 
-  defp status_badge_class(_), do: "px-3 py-1 text-xs rounded-full bg-slate-700 text-slate-300"
+  # defp status_badge_class(_), do: "px-3 py-1 text-xs rounded-full bg-slate-700 text-slate-300"
 end

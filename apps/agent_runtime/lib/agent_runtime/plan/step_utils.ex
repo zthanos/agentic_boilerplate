@@ -153,6 +153,27 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
     end
   end
 
+  def require_nonblank_opt!(opts, key, step_name) when is_list(opts) do
+    val =
+      case key do
+        k when is_atom(k) ->
+          Keyword.get(opts, k) || Keyword.get(opts, Atom.to_string(k))
+
+        k when is_binary(k) ->
+          Keyword.get(opts, k) || Keyword.get(opts, String.to_atom(k))
+      end
+
+    cond do
+      is_binary(val) and String.trim(val) != "" ->
+        {:ok, String.trim(val)}
+
+      true ->
+        {:error, {:missing_or_blank, %{step: step_name, key: key}}}
+    end
+  end
+
+
+
   def enforce_null_when_false(map, bool_key, string_key) when is_map(map) do
     case boolean(map, bool_key, false) do
       true -> map

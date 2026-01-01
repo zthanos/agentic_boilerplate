@@ -1,12 +1,15 @@
+# config/test.exs
 import Config
 
 # -----------------------------------------------------------------------------
 # agent_web Repo (Postgres)
 # -----------------------------------------------------------------------------
 config :agent_web, AgentWeb.Repo,
-  url: System.get_env("DATABASE_URL") || "ecto://postgres:postgres@localhost:5432/agent_web_test",
+  url: "ecto://postgres:postgres@localhost:15432/agent_web_test",
   pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: 5
+  pool_size: 5,
+  types: AgentWeb.PostgrexTypes
+
 
 # -----------------------------------------------------------------------------
 # agent_web Endpoint (no server in test)
@@ -34,3 +37,18 @@ config :agent_core, AgentCore.Llm.Runs,
 
 config :agent_core, AgentCore.Llm.ProviderRouter,
   openai: AgentCore.Llm.Providers.FakeProvider
+
+
+config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
+  openai_compatible: [
+    base_url: "http://localhost:1234/v1",
+    api_key: "",
+    timeout_ms: 60_000,
+    connect_timeout_ms: 10_000
+  ]
+
+config :agent_runtime, AgentRuntime.Llm.ModelResolver,
+  openai_compatible: %{
+    local: "openai/gpt-oss-20b",
+    gpt4mini: "gpt-4o-mini"
+  }

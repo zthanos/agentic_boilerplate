@@ -35,6 +35,7 @@ defmodule AgentWebWeb.Layouts do
 
   def app(assigns) do
     ~H"""
+    <div class="grid grid-rows-[auto_1fr] h-screen">
     <header class="navbar px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
         <a href="/" class="flex-1 flex w-fit items-center gap-2">
@@ -62,13 +63,14 @@ defmodule AgentWebWeb.Layouts do
       </div>
     </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
+    <main class="px-4 py-10 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-4xl min-h-full">
         {render_slot(@inner_block)}
       </div>
     </main>
 
     <.flash_group flash={@flash} />
+    </div>
     """
   end
 

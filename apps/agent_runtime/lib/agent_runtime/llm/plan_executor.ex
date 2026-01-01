@@ -212,12 +212,11 @@ defmodule AgentRuntime.Llm.PlanExecutor do
     :ok
   end
 
-  # Prefer stable, plan-friendly naming: use step_mod.name/0.
-  # Falls back to module name if name/0 returns unexpected.
   defp step_phase_name(step_mod) do
     case step_mod.name() do
       name when is_binary(name) ->
         trimmed_name = String.trim(name)
+
         if byte_size(trimmed_name) > 0 do
           trimmed_name
         else
@@ -229,8 +228,6 @@ defmodule AgentRuntime.Llm.PlanExecutor do
     end
   end
 
-  # Extract the last run_id from debug trail for parent linking.
-  # Your PlanContext.add_debug stores entries as %{step: ..., data: %{...}}.
   defp get_last_run_id(%PlanContext{debug: debug}) when is_list(debug) do
     debug
     |> Enum.reverse()
@@ -253,13 +250,38 @@ defmodule AgentRuntime.Llm.PlanExecutor do
     policies = plan.policies || %{}
     step_policy = get_in(policies, ["steps", step_mod.name()]) || %{}
 
-    Keyword.merge(base, Map.to_list(step_policy))
+    Keyword.merge(base, policy_to_keyword(step_policy))
   end
 
-  # Base options:
-  # - per-step base opts: opts[:step_opts][StepModule] (keyword)
-  # - injected infra: assessor_profile/overrides, memory_store
-  # - Execute step receives streaming flags
+  # Convert JSON-style step policy to keyword opts safely (no String.to_atom/1).
+  defp policy_to_keyword(nil), do: []
+
+  defp policy_to_keyword(%{} = m) do
+    allowed = %{
+      "system_prompt" => :system_prompt,
+      "top_k" => :top_k,
+      "similarity_threshold" => :similarity_threshold,
+      "min_score" => :min_score,
+      "assessor_profile" => :assessor_profile,
+      "assessor_overrides" => :assessor_overrides,
+      "execution_overrides" => :execution_overrides
+    }
+
+    Enum.reduce(m, [], fn {k, v}, acc ->
+      case Map.get(allowed, k) do
+        nil -> acc
+        atom_key -> [{atom_key, v} | acc]
+      end
+    end)
+    |> Enum.reverse()
+  end
+
+  defp policy_to_keyword(list) when is_list(list) do
+    if Keyword.keyword?(list), do: list, else: []
+  end
+
+  defp policy_to_keyword(_), do: []
+
   defp step_opts_base(step_mod, opts) do
     per_step = Keyword.get(opts, :step_opts, %{})
     base = Map.get(per_step, step_mod, [])

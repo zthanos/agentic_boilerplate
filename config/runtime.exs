@@ -114,3 +114,7 @@ config :agent_runtime, :conversations_adapter, AgentWeb.Conversations.Adapter
 config :agent_runtime, :plan_store, AgentWeb.Llm.PlanStoreEcto
 
 config :agent_runtime, :agent_store, AgentWeb.Llm.AgentStoreEcto
+
+config :logger,
+  handle_otp_reports: false,
+  handle_sasl_reports: false
