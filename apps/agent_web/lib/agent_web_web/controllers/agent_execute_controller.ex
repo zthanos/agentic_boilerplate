@@ -6,7 +6,10 @@ defmodule AgentWebWeb.AgentExecuteController do
   alias AgentWeb.Llm.InputMapper
   alias AgentWeb.Streaming.SseManager
 
-  def stream(conn, %{"profile_id" => profile_id, "agent_id" => agent_id, "input" => input} = params) do
+  def stream(
+        conn,
+        %{"profile_id" => profile_id, "agent_id" => agent_id, "input" => input} = params
+      ) do
     overrides = Map.get(params, "overrides", %{})
     agent_version = normalize_version(Map.get(params, "agent_version"))
 
@@ -23,11 +26,9 @@ defmodule AgentWebWeb.AgentExecuteController do
           runtime_input,
           exec_meta,
           on_chunk,
-          [
-            agent_id: agent_id,
-            agent_version: agent_version,
-            memory_store: AgentWeb.Memory.Store
-          ]
+          agent_id: agent_id,
+          agent_version: agent_version,
+          memory_store: AgentWeb.Memory.Store
         )
       end)
     else
@@ -59,8 +60,12 @@ defmodule AgentWebWeb.AgentExecuteController do
     v = String.trim(v)
 
     cond do
-      v == "" -> :latest
-      v == "latest" -> :latest
+      v == "" ->
+        :latest
+
+      v == "latest" ->
+        :latest
+
       true ->
         case Integer.parse(v) do
           {n, ""} when n >= 0 -> n

@@ -50,12 +50,14 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
     # Generate recommendations from parsed tests
     recommendations =
       case Map.get(analysis_results, :parsed_tests, []) do
-        [] -> recommendations
-        tests ->
+        [] ->
           recommendations
-          ++ suggest_refactoring(tests)
-          ++ recommend_modern_practices(tests)
-          ++ suggest_performance_optimizations(tests)
+
+        tests ->
+          recommendations ++
+            suggest_refactoring(tests) ++
+            recommend_modern_practices(tests) ++
+            suggest_performance_optimizations(tests)
       end
 
     # Prioritize and return recommendations
@@ -135,7 +137,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       %Recommendation{
         type: :add_test,
         priority: gap.priority,
-        title: "Add test for #{gap.module_name}#{if gap.function_name, do: ".#{gap.function_name}", else: ""}",
+        title:
+          "Add test for #{gap.module_name}#{if gap.function_name, do: ".#{gap.function_name}", else: ""}",
         description: "#{gap.description}. Consider adding #{gap.suggested_test_type}.",
         affected_files: [infer_test_file_path(gap.module_name)],
         estimated_effort: determine_test_effort(gap.gap_type),
@@ -212,11 +215,11 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
 
   defp is_potentially_slow_test?(test) do
     # High complexity score indicates potential performance issues
-    test.complexity_score > 8.0 or
     # Many dependencies might indicate slow setup
-    length(test.dependencies) > 10 or
     # Certain test types are typically slower
-    test.test_type in [:integration, :end_to_end]
+    test.complexity_score > 8.0 or
+      length(test.dependencies) > 10 or
+      test.test_type in [:integration, :end_to_end]
   end
 
   defp suggest_test_optimizations(test) do
@@ -244,7 +247,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       type: :refactor_test,
       priority: :medium,
       title: "Simplify complex test: #{test.name}",
-      description: "Test has high complexity score (#{test.complexity_score}). Consider breaking into smaller, focused tests.",
+      description:
+        "Test has high complexity score (#{test.complexity_score}). Consider breaking into smaller, focused tests.",
       affected_files: [test.file_path],
       estimated_effort: :medium,
       justification: "Complex tests are harder to maintain and debug when they fail"
@@ -256,7 +260,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       type: :refactor_test,
       priority: :low,
       title: "Reduce assertions in test: #{test.name}",
-      description: "Test has #{length(test.assertions)} assertions. Consider splitting into multiple focused tests.",
+      description:
+        "Test has #{length(test.assertions)} assertions. Consider splitting into multiple focused tests.",
       affected_files: [test.file_path],
       estimated_effort: :small,
       justification: "Tests with many assertions are harder to understand and debug"
@@ -268,7 +273,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       type: :refactor_test,
       priority: :low,
       title: "Simplify test setup: #{test.name}",
-      description: "Test has #{length(test.setup_blocks)} setup blocks. Consider extracting common setup to shared fixtures.",
+      description:
+        "Test has #{length(test.setup_blocks)} setup blocks. Consider extracting common setup to shared fixtures.",
       affected_files: [test.file_path],
       estimated_effort: :medium,
       justification: "Excessive setup makes tests harder to understand and maintain"
@@ -280,7 +286,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       type: :modernize_pattern,
       priority: :medium,
       title: "Modernize Phoenix test patterns: #{test.name}",
-      description: "Test uses deprecated Phoenix testing patterns. Update to use modern Phoenix 1.8+ practices.",
+      description:
+        "Test uses deprecated Phoenix testing patterns. Update to use modern Phoenix 1.8+ practices.",
       affected_files: [test.file_path],
       estimated_effort: :small,
       justification: "Modern Phoenix patterns improve test reliability and maintainability"
@@ -292,7 +299,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       type: :modernize_pattern,
       priority: :low,
       title: "Update assertion patterns: #{test.name}",
-      description: "Test uses outdated assertion patterns. Consider using modern ExUnit assertions.",
+      description:
+        "Test uses outdated assertion patterns. Consider using modern ExUnit assertions.",
       affected_files: [test.file_path],
       estimated_effort: :small,
       justification: "Modern assertion patterns provide better error messages and debugging"
@@ -304,7 +312,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       type: :refactor_test,
       priority: :medium,
       title: "Optimize test performance: #{test.name}",
-      description: "Test has high complexity and may be slow. Consider optimizing setup, using mocks, or parallel execution.",
+      description:
+        "Test has high complexity and may be slow. Consider optimizing setup, using mocks, or parallel execution.",
       affected_files: [test.file_path],
       estimated_effort: :medium,
       justification: "Slow tests impact development velocity and CI/CD pipeline performance"
@@ -316,7 +325,8 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
       type: :refactor_test,
       priority: :low,
       title: "Reduce test dependencies: #{test.name}",
-      description: "Test has #{length(test.dependencies)} dependencies. Consider using mocks or test doubles to reduce coupling.",
+      description:
+        "Test has #{length(test.dependencies)} dependencies. Consider using mocks or test doubles to reduce coupling.",
       affected_files: [test.file_path],
       estimated_effort: :medium,
       justification: "Tests with many dependencies are fragile and slow"
@@ -327,17 +337,19 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
     # Check for common deprecated patterns in assertions
     Enum.any?(test.assertions, fn assertion ->
       String.contains?(assertion, "Phoenix.View") or
-      String.contains?(assertion, "live_redirect") or
-      String.contains?(assertion, "live_patch") or
-      String.contains?(assertion, "form_for")
+        String.contains?(assertion, "live_redirect") or
+        String.contains?(assertion, "live_patch") or
+        String.contains?(assertion, "form_for")
     end)
   end
 
   defp has_old_assertion_patterns?(test) do
     # Check for old assertion patterns
     Enum.any?(test.assertions, fn assertion ->
-      String.contains?(assertion, "assert_receive") and not String.contains?(assertion, "assert_received") or
-      String.contains?(assertion, "refute_receive") and not String.contains?(assertion, "refute_received")
+      (String.contains?(assertion, "assert_receive") and
+         not String.contains?(assertion, "assert_received")) or
+        (String.contains?(assertion, "refute_receive") and
+           not String.contains?(assertion, "refute_received"))
     end)
   end
 
@@ -364,19 +376,21 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
   defp gap_type_description(:untested_component), do: "untested component interactions"
 
   defp priority_score(recommendation) do
-    base_score = case recommendation.priority do
-      :critical -> 1000
-      :high -> 100
-      :medium -> 10
-      :low -> 1
-    end
+    base_score =
+      case recommendation.priority do
+        :critical -> 1000
+        :high -> 100
+        :medium -> 10
+        :low -> 1
+      end
 
     # Adjust score based on effort (prefer quick wins)
-    effort_modifier = case recommendation.estimated_effort do
-      :small -> 1.5
-      :medium -> 1.0
-      :large -> 0.7
-    end
+    effort_modifier =
+      case recommendation.estimated_effort do
+        :small -> 1.5
+        :medium -> 1.0
+        :large -> 0.7
+      end
 
     base_score * effort_modifier
   end

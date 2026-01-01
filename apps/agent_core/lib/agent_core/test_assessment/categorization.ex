@@ -89,18 +89,20 @@ defmodule AgentCore.TestAssessment.Categorization do
   @spec assign_confidence_score(TestCategory.t()) :: TestCategory.t()
   def assign_confidence_score(category) do
     # Normalize confidence scores to ensure they sum to 1.0
-    total_confidence = category.confidence_scores
-                      |> Map.values()
-                      |> Enum.sum()
-
-    normalized_scores = if total_confidence > 0 do
+    total_confidence =
       category.confidence_scores
-      |> Enum.map(fn {type, score} -> {type, score / total_confidence} end)
-      |> Enum.into(%{})
-    else
-      # Default to unit test if no patterns match
-      %{unit: 1.0, integration: 0.0, property_based: 0.0, end_to_end: 0.0}
-    end
+      |> Map.values()
+      |> Enum.sum()
+
+    normalized_scores =
+      if total_confidence > 0 do
+        category.confidence_scores
+        |> Enum.map(fn {type, score} -> {type, score / total_confidence} end)
+        |> Enum.into(%{})
+      else
+        # Default to unit test if no patterns match
+        %{unit: 1.0, integration: 0.0, property_based: 0.0, end_to_end: 0.0}
+      end
 
     %{category | confidence_scores: normalized_scores}
   end
@@ -132,9 +134,10 @@ defmodule AgentCore.TestAssessment.Categorization do
   end
 
   defp calculate_pattern_confidence(content, patterns) do
-    matches = patterns
-              |> Enum.map(&count_pattern_matches(content, &1))
-              |> Enum.sum()
+    matches =
+      patterns
+      |> Enum.map(&count_pattern_matches(content, &1))
+      |> Enum.sum()
 
     # Convert match count to confidence score (0.0 to 1.0)
     case matches do
@@ -153,15 +156,17 @@ defmodule AgentCore.TestAssessment.Categorization do
 
   defp determine_types(confidence_scores) do
     # Sort by confidence score descending
-    sorted_scores = confidence_scores
-                   |> Enum.sort_by(fn {_type, score} -> score end, :desc)
+    sorted_scores =
+      confidence_scores
+      |> Enum.sort_by(fn {_type, score} -> score end, :desc)
 
     case sorted_scores do
       [{primary_type, primary_score} | rest] when primary_score > 0.0 ->
         # Include secondary types with confidence > 0.3
-        secondary_types = rest
-                         |> Enum.filter(fn {_type, score} -> score > 0.3 end)
-                         |> Enum.map(fn {type, _score} -> type end)
+        secondary_types =
+          rest
+          |> Enum.filter(fn {_type, score} -> score > 0.3 end)
+          |> Enum.map(fn {type, _score} -> type end)
 
         {primary_type, secondary_types}
 
@@ -181,17 +186,19 @@ defmodule AgentCore.TestAssessment.Categorization do
 
   defp extract_test_pattern(parsed_test) do
     # Extract pattern based on test structure and naming
-    base_pattern = cond do
-      String.contains?(parsed_test.name, "property") -> "property_test"
-      String.contains?(parsed_test.name, "integration") -> "integration_test"
-      String.contains?(parsed_test.name, "e2e") -> "e2e_test"
-      length(parsed_test.assertions) > 5 -> "complex_test"
-      length(parsed_test.setup_blocks) > 2 -> "setup_heavy_test"
-      true -> "standard_test"
-    end
+    base_pattern =
+      cond do
+        String.contains?(parsed_test.name, "property") -> "property_test"
+        String.contains?(parsed_test.name, "integration") -> "integration_test"
+        String.contains?(parsed_test.name, "e2e") -> "e2e_test"
+        length(parsed_test.assertions) > 5 -> "complex_test"
+        length(parsed_test.setup_blocks) > 2 -> "setup_heavy_test"
+        true -> "standard_test"
+      end
 
     # Add focus area to pattern if detected
     focus_areas = extract_focus_areas(build_test_content(parsed_test))
+
     case focus_areas do
       [area | _] -> "#{base_pattern}_#{area}"
       [] -> base_pattern

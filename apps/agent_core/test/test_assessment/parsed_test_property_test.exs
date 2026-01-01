@@ -6,7 +6,7 @@ defmodule AgentCore.TestAssessment.ParsedTestPropertyTest do
 
   # Feature: test-assessment, Property 1: ParsedTest field validation
   property "parsed_test.name should always be a non-empty string when valid" do
-    check all name <- string(:alphanumeric, min_length: 1, max_length: 100) do
+    check all(name <- string(:alphanumeric, min_length: 1, max_length: 100)) do
       parsed_test = %ParsedTest{
         name: name,
         file_path: "/test/example.exs",
@@ -25,7 +25,7 @@ defmodule AgentCore.TestAssessment.ParsedTestPropertyTest do
 
   # Feature: test-assessment, Property 2: ParsedTest test_type validation
   property "parsed_test.test_type should be a valid atom" do
-    check all test_type <- member_of([:test, :describe, :setup, :property]) do
+    check all(test_type <- member_of([:test, :describe, :setup, :property])) do
       parsed_test = %ParsedTest{
         name: "test example",
         file_path: "/test/example.exs",
@@ -44,7 +44,7 @@ defmodule AgentCore.TestAssessment.ParsedTestPropertyTest do
 
   # Feature: test-assessment, Property 3: ParsedTest complexity_score validation
   property "parsed_test.complexity_score should be a non-negative float" do
-    check all complexity <- float(min: 0.0, max: 100.0) do
+    check all(complexity <- float(min: 0.0, max: 100.0)) do
       parsed_test = %ParsedTest{
         name: "test example",
         file_path: "/test/example.exs",
@@ -63,8 +63,14 @@ defmodule AgentCore.TestAssessment.ParsedTestPropertyTest do
 
   # Feature: test-assessment, Property 4: ParsedTest file_path validation
   property "parsed_test.file_path should be a valid file path string" do
-    check all path_parts <- list_of(string(:alphanumeric, min_length: 1, max_length: 20), min_length: 1, max_length: 5),
-              extension <- member_of(["exs", "ex"]) do
+    check all(
+            path_parts <-
+              list_of(string(:alphanumeric, min_length: 1, max_length: 20),
+                min_length: 1,
+                max_length: 5
+              ),
+            extension <- member_of(["exs", "ex"])
+          ) do
       file_path = "/" <> Enum.join(path_parts, "/") <> "." <> extension
 
       parsed_test = %ParsedTest{
@@ -80,13 +86,15 @@ defmodule AgentCore.TestAssessment.ParsedTestPropertyTest do
 
       assert is_binary(parsed_test.file_path)
       assert String.contains?(parsed_test.file_path, ".")
-      assert String.ends_with?(parsed_test.file_path, ".exs") or String.ends_with?(parsed_test.file_path, ".ex")
+
+      assert String.ends_with?(parsed_test.file_path, ".exs") or
+               String.ends_with?(parsed_test.file_path, ".ex")
     end
   end
 
   # Feature: test-assessment, Property 5: ParsedTest line_number validation
   property "parsed_test.line_number should be a positive integer" do
-    check all line_number <- positive_integer() do
+    check all(line_number <- positive_integer()) do
       parsed_test = %ParsedTest{
         name: "test example",
         file_path: "/test/example.exs",
@@ -105,9 +113,11 @@ defmodule AgentCore.TestAssessment.ParsedTestPropertyTest do
 
   # Feature: test-assessment, Property 6: ParsedTest list fields validation
   property "parsed_test list fields should always be lists" do
-    check all setup_blocks <- list_of(string(:alphanumeric, min_length: 1, max_length: 50)),
-              assertions <- list_of(string(:alphanumeric, min_length: 1, max_length: 50)),
-              dependencies <- list_of(string(:alphanumeric, min_length: 1, max_length: 30)) do
+    check all(
+            setup_blocks <- list_of(string(:alphanumeric, min_length: 1, max_length: 50)),
+            assertions <- list_of(string(:alphanumeric, min_length: 1, max_length: 50)),
+            dependencies <- list_of(string(:alphanumeric, min_length: 1, max_length: 30))
+          ) do
       parsed_test = %ParsedTest{
         name: "test example",
         file_path: "/test/example.exs",
@@ -188,15 +198,18 @@ defmodule AgentCore.TestAssessment.ParsedTestPropertyTest do
   defp validate_complexity_score(%ParsedTest{complexity_score: score}) when score < 0 do
     raise ArgumentError, "complexity_score must be non-negative"
   end
+
   defp validate_complexity_score(parsed_test), do: parsed_test
 
   defp validate_line_number(%ParsedTest{line_number: line}) when line <= 0 do
     raise ArgumentError, "line_number must be positive"
   end
+
   defp validate_line_number(parsed_test), do: parsed_test
 
   defp validate_name(%ParsedTest{name: name}) when name == "" do
     raise ArgumentError, "name cannot be empty"
   end
+
   defp validate_name(parsed_test), do: parsed_test
 end

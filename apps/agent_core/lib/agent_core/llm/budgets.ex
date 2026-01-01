@@ -8,11 +8,10 @@ defmodule AgentCore.Llm.Budgets do
   ]
 
   @type t :: %__MODULE__{
-    max_input_tokens: integer() | nil,
-    max_output_tokens: integer() | nil,
-    max_total_tokens: integer() | nil,
-    max_cost_eur: float() | nil,
-    max_steps: integer() | nil,
-  }
-
+          max_input_tokens: integer() | nil,
+          max_output_tokens: integer() | nil,
+          max_total_tokens: integer() | nil,
+          max_cost_eur: float() | nil,
+          max_steps: integer() | nil
+        }
 end

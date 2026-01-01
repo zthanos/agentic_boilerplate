@@ -25,13 +25,11 @@ defmodule AgentWebWeb.Router do
     live "/chat/:conversation_id/plan", PlanExecuteLive, :index
     live "/conversations", ChatExecuteLive, :index
     live "/conversations/:conversation_id", ChatExecuteLive, :index
-
   end
 
   pipeline :sse do
     plug :fetch_session
   end
-
 
   scope "/api" do
     pipe_through :api
@@ -52,9 +50,6 @@ defmodule AgentWebWeb.Router do
     post "/llm/execute", LlmExecuteController, :execute
     get "/agents", AgentController, :index
     get "/agents/:agent_id/latest", AgentController, :show_latest
-
-
-
   end
 
   scope "/api", AgentWebWeb do
@@ -63,11 +58,7 @@ defmodule AgentWebWeb.Router do
     post "/llm/execute/stream", LlmExecuteController, :stream
     post "/plans/execute/stream", PlanExecuteController, :stream
     post "/agents/execute/stream", AgentExecuteController, :stream
-
   end
-
-
-
 
   # Other scopes may use custom stacks.
   # scope "/api", AgentWebWeb do

@@ -75,7 +75,14 @@ defmodule AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStep do
     end
   end
 
-  defp execute_history_assessment(ctx, executor, assessor_profile, overrides, system_prompt, user_prompt) do
+  defp execute_history_assessment(
+         ctx,
+         executor,
+         assessor_profile,
+         overrides,
+         system_prompt,
+         user_prompt
+       ) do
     llm_input = %{
       type: :chat,
       messages: [

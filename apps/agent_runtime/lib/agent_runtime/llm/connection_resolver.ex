@@ -27,8 +27,12 @@ defmodule AgentRuntime.Llm.ConnectionResolver do
 
   defp env_int(key, default) do
     case System.get_env(key) do
-      nil -> default
-      "" -> default
+      nil ->
+        default
+
+      "" ->
+        default
+
       v ->
         case Integer.parse(v) do
           {i, _} when i > 0 -> i

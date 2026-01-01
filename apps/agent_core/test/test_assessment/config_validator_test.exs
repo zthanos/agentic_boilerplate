@@ -43,10 +43,11 @@ defmodule AgentCore.TestAssessment.ConfigValidatorTest do
 
       # Should find missing test dependencies
       assert length(issues) > 0
+
       assert Enum.any?(issues, fn issue ->
-        issue.issue_type == :missing_dependency and
-        String.contains?(issue.description, "ex_machina")
-      end)
+               issue.issue_type == :missing_dependency and
+                 String.contains?(issue.description, "ex_machina")
+             end)
 
       # Cleanup
       File.rm_rf!(temp_dir)
@@ -82,9 +83,12 @@ defmodule AgentCore.TestAssessment.ConfigValidatorTest do
 
       # Should identify missing test configs
       assert length(issues) > 0
-      missing_config_issue = Enum.find(issues, fn issue ->
-        String.contains?(issue.description, "No test.exs configuration files found")
-      end)
+
+      missing_config_issue =
+        Enum.find(issues, fn issue ->
+          String.contains?(issue.description, "No test.exs configuration files found")
+        end)
+
       assert missing_config_issue != nil
 
       # Cleanup
@@ -114,9 +118,10 @@ defmodule AgentCore.TestAssessment.ConfigValidatorTest do
 
       # Should find missing database and logger configurations
       assert length(issues) > 0
+
       assert Enum.any?(issues, fn issue ->
-        String.contains?(issue.description, "database configuration")
-      end)
+               String.contains?(issue.description, "database configuration")
+             end)
 
       # Cleanup
       File.rm_rf!(temp_dir)
@@ -150,9 +155,10 @@ defmodule AgentCore.TestAssessment.ConfigValidatorTest do
 
       # Should find database naming issue
       assert length(issues) > 0
+
       assert Enum.any?(issues, fn issue ->
-        String.contains?(issue.description, "_test")
-      end)
+               String.contains?(issue.description, "_test")
+             end)
 
       # Cleanup
       File.rm_rf!(temp_dir)
@@ -184,9 +190,10 @@ defmodule AgentCore.TestAssessment.ConfigValidatorTest do
 
       # Should find server configuration issue
       assert length(issues) > 0
+
       assert Enum.any?(issues, fn issue ->
-        String.contains?(issue.description, "server: false")
-      end)
+               String.contains?(issue.description, "server: false")
+             end)
 
       # Cleanup
       File.rm_rf!(temp_dir)
@@ -241,9 +248,12 @@ defmodule AgentCore.TestAssessment.ConfigValidatorTest do
 
       # Should find Elixir version mismatch
       assert length(issues) > 0
-      version_mismatch = Enum.find(issues, fn issue ->
-        String.contains?(issue.description, "Elixir version mismatch")
-      end)
+
+      version_mismatch =
+        Enum.find(issues, fn issue ->
+          String.contains?(issue.description, "Elixir version mismatch")
+        end)
+
       assert version_mismatch != nil
 
       # Cleanup
@@ -284,7 +294,14 @@ defmodule AgentCore.TestAssessment.ConfigValidatorTest do
         assert %ConfigIssue{} = issue
         assert is_binary(issue.app_name)
         assert is_binary(issue.file_path)
-        assert issue.issue_type in [:missing_dependency, :inconsistent_config, :invalid_setting, :deprecated_pattern]
+
+        assert issue.issue_type in [
+                 :missing_dependency,
+                 :inconsistent_config,
+                 :invalid_setting,
+                 :deprecated_pattern
+               ]
+
         assert issue.severity in [:warning, :error, :critical]
         assert is_binary(issue.description)
         assert is_binary(issue.suggested_fix)

@@ -60,34 +60,40 @@ defmodule AgentWeb.Streaming.SseManager do
         end
 
       # Successful execution with results
-      {:sse_result, {:ok, %{
-        run_id: run_id,
-        trace_id: trace_id,
-        fingerprint: fp,
-        latency_ms: latency,
-        response: resp
-      }}} ->
+      {:sse_result,
+       {:ok,
+        %{
+          run_id: run_id,
+          trace_id: trace_id,
+          fingerprint: fp,
+          latency_ms: latency,
+          response: resp
+        }}} ->
         usage = fetch_field(resp, [:usage, "usage"])
         _ = send_event(conn, StreamEvent.done(run_id, trace_id, fp, latency, usage))
         conn
 
       # Clarification needed
-      {:sse_result, {:ok, %{
-        mode: :needs_clarification,
-        trace_id: trace_id,
-        question: question
-      }}} ->
+      {:sse_result,
+       {:ok,
+        %{
+          mode: :needs_clarification,
+          trace_id: trace_id,
+          question: question
+        }}} ->
         _ = send_event(conn, StreamEvent.clarify(trace_id, question))
         conn
 
       # Error result
-      {:sse_result, {:error, %{
-        reason: reason,
-        run_id: run_id,
-        trace_id: trace_id,
-        fingerprint: fp,
-        latency_ms: latency
-      }}} ->
+      {:sse_result,
+       {:error,
+        %{
+          reason: reason,
+          run_id: run_id,
+          trace_id: trace_id,
+          fingerprint: fp,
+          latency_ms: latency
+        }}} ->
         error = normalize_error(reason)
         _ = send_event(conn, StreamEvent.error(error, run_id, trace_id, fp, latency))
         conn
@@ -105,6 +111,7 @@ defmodule AgentWeb.Streaming.SseManager do
           "message" => "stream_worker_crashed",
           "detail" => inspect(reason)
         }
+
         _ = send_event(conn, StreamEvent.error(error))
         conn
     after
@@ -125,19 +132,22 @@ defmodule AgentWeb.Streaming.SseManager do
   def stream_with_events(conn, stream_fn) do
     parent = self()
 
-    task = Task.async(fn ->
-      on_chunk = fn token ->
-        send(parent, {:sse_token, token || ""})
-        :ok
-      end
+    task =
+      Task.async(fn ->
+        on_chunk = fn token ->
+          send(parent, {:sse_token, token || ""})
+          :ok
+        end
 
-      result = stream_fn.(on_chunk)
-      send(parent, {:sse_result, result})
-      :ok
-    end)
+        result = stream_fn.(on_chunk)
+        send(parent, {:sse_result, result})
+        :ok
+      end)
 
     case send_event(conn, StreamEvent.open()) do
-      {:ok, conn} -> event_loop(conn, task.ref)
+      {:ok, conn} ->
+        event_loop(conn, task.ref)
+
       {:error, _reason} ->
         Task.shutdown(task, :brutal_kill)
         conn
@@ -148,11 +158,12 @@ defmodule AgentWeb.Streaming.SseManager do
 
   defp fetch_field(map, keys) when is_list(keys) do
     Enum.reduce_while(keys, nil, fn k, _acc ->
-      v = cond do
-        is_map(map) and is_atom(k) -> Map.get(map, k)
-        is_map(map) and is_binary(k) -> Map.get(map, k)
-        true -> nil
-      end
+      v =
+        cond do
+          is_map(map) and is_atom(k) -> Map.get(map, k)
+          is_map(map) and is_binary(k) -> Map.get(map, k)
+          true -> nil
+        end
 
       if is_nil(v), do: {:cont, nil}, else: {:halt, v}
     end)

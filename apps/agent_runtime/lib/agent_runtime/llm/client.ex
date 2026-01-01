@@ -15,8 +15,8 @@ defmodule AgentRuntime.Llm.Client do
     ProviderRequest
     # ProviderAdapter
   }
-  alias AgentRuntime.Llm.ProviderRouter
 
+  alias AgentRuntime.Llm.ProviderRouter
 
   @type chat_message :: map()
   @type overrides :: map()

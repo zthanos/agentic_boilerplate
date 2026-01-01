@@ -22,7 +22,24 @@ defmodule AgentWeb.Memory.Chunk do
   @doc false
   def changeset(chunk, attrs) do
     chunk
-    |> cast(attrs, [:id, :conversation_id, :chunk_text, :chunk_hash, :token_count, :embedding, :source_message_ids, :metadata, :expires_at])
-    |> validate_required([:id, :conversation_id, :chunk_text, :chunk_hash, :token_count, :embedding])
+    |> cast(attrs, [
+      :id,
+      :conversation_id,
+      :chunk_text,
+      :chunk_hash,
+      :token_count,
+      :embedding,
+      :source_message_ids,
+      :metadata,
+      :expires_at
+    ])
+    |> validate_required([
+      :id,
+      :conversation_id,
+      :chunk_text,
+      :chunk_hash,
+      :token_count,
+      :embedding
+    ])
   end
 end

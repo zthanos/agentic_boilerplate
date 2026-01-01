@@ -3,7 +3,6 @@ defmodule AgentCore.Llm.Profiles do
 
   alias AgentCore.Llm.LLMProfile
 
-
   defp store do
     Application.fetch_env!(:agent_core, __MODULE__)
     |> Keyword.fetch!(:store)
@@ -20,8 +19,11 @@ defmodule AgentCore.Llm.Profiles do
   @dialyzer {:nowarn_function, get!: 1}
   @spec get!(id()) :: AgentCore.Llm.LLMProfile.t() | no_return()
   def get!(id) do
-    case store().get(id) do  # <-- Αλλαγή: ΚΑΛΕΣΕ ΤΟ ΠΑΝΩ get/1
-      {:ok, %AgentCore.Llm.LLMProfile{} = profile} -> profile
+    # <-- Αλλαγή: ΚΑΛΕΣΕ ΤΟ ΠΑΝΩ get/1
+    case store().get(id) do
+      {:ok, %AgentCore.Llm.LLMProfile{} = profile} ->
+        profile
+
       :error ->
         raise ArgumentError, "LLMProfile not found: #{inspect(id)}"
     end

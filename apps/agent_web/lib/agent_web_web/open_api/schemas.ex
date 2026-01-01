@@ -4,6 +4,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule ChatMessage do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "ChatMessage",
       type: :object,
@@ -18,6 +19,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule LlmInputChat do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "LlmInputChat",
       type: :object,
@@ -36,6 +38,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule LlmExecuteRequest do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "LlmExecuteRequest",
       type: :object,
@@ -47,13 +50,18 @@ defmodule AgentWeb.OpenApi.Schemas do
         overrides: %Schema{type: :object, nullable: true, additionalProperties: true},
         trace_id: %Schema{type: :string, nullable: true},
         parent_run_id: %Schema{type: :string, nullable: true},
-        phase: %Schema{type: :string, nullable: true, enum: ["draft", "critique", "revise", "final"]}
+        phase: %Schema{
+          type: :string,
+          nullable: true,
+          enum: ["draft", "critique", "revise", "final"]
+        }
       }
     })
   end
 
   defmodule Usage do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "Usage",
       type: :object,
@@ -68,6 +76,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule LlmExecuteResponseOk do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "LlmExecuteResponseOk",
       type: :object,
@@ -88,6 +97,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule LlmExecuteResponseError do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "LlmExecuteResponseError",
       type: :object,
@@ -107,6 +117,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule RunSnapshot do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "RunSnapshot",
       type: :object,
@@ -142,6 +153,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule RunsIndexResponse do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "RunsIndexResponse",
       type: :object,
@@ -164,6 +176,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule RunShowResponse do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "RunShowResponse",
       type: :object,
@@ -177,6 +190,7 @@ defmodule AgentWeb.OpenApi.Schemas do
 
   defmodule ApiError do
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "ApiError",
       type: :object,

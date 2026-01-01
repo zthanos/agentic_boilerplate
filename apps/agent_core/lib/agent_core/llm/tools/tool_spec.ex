@@ -7,12 +7,18 @@ defmodule AgentCore.Llm.Tools.ToolSpec do
 
   @enforce_keys [:id]
   defstruct [
-    :id,                 # canonical string id, e.g. "web.search"
-    :name,               # optional display name
-    :description,        # optional description
-    params_schema: %{},  # optional schema map (JSON-schema-ish)
-    compatibility: %{},  # e.g. %{openai: true, azure_openai: true}
-    flags: %{}           # e.g. %{experimental: true}
+    # canonical string id, e.g. "web.search"
+    :id,
+    # optional display name
+    :name,
+    # optional description
+    :description,
+    # optional schema map (JSON-schema-ish)
+    params_schema: %{},
+    # e.g. %{openai: true, azure_openai: true}
+    compatibility: %{},
+    # e.g. %{experimental: true}
+    flags: %{}
   ]
 
   @type t :: %__MODULE__{

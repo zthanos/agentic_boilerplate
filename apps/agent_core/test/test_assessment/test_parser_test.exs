@@ -227,24 +227,33 @@ defmodule AgentCore.TestAssessment.TestParserTest do
 
       score = TestParser.calculate_complexity_score(ast)
 
-      assert score > 1.0  # Base score + assertion
-      assert score < 3.0  # Should not be too complex
+      # Base score + assertion
+      assert score > 1.0
+      # Should not be too complex
+      assert score < 3.0
     end
 
     test "calculates higher complexity for nested test" do
       # Test with multiple assertions and conditionals
-      ast = {:test, [], [
-        "complex test",
-        [do: {:__block__, [], [
-          {:if, [], [true, [do: {:assert, [], [true]}]]},
-          {:case, [], [1, [do: [{:->, [], [[1], {:assert, [], [true]}]}]]]},
-          {:assert, [], [false]}
-        ]}]
-      ]}
+      ast =
+        {:test, [],
+         [
+           "complex test",
+           [
+             do:
+               {:__block__, [],
+                [
+                  {:if, [], [true, [do: {:assert, [], [true]}]]},
+                  {:case, [], [1, [do: [{:->, [], [[1], {:assert, [], [true]}]}]]]},
+                  {:assert, [], [false]}
+                ]}
+           ]
+         ]}
 
       score = TestParser.calculate_complexity_score(ast)
 
-      assert score > 3.0  # Should be more complex due to nesting and conditionals
+      # Should be more complex due to nesting and conditionals
+      assert score > 3.0
     end
 
     test "returns base score for empty test" do
@@ -253,8 +262,10 @@ defmodule AgentCore.TestAssessment.TestParserTest do
       score = TestParser.calculate_complexity_score(ast)
 
       # The base score is 1.0, but there might be some nesting depth counted
-      assert score >= 1.0  # Should be at least base score
-      assert score <= 2.0  # Should not be too complex for empty test
+      # Should be at least base score
+      assert score >= 1.0
+      # Should not be too complex for empty test
+      assert score <= 2.0
     end
   end
 

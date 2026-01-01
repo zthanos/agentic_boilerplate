@@ -7,7 +7,9 @@ defmodule AgentRuntime.Llm.ModelResolverTest do
     prev = Application.get_env(:agent_runtime, ModelResolver)
 
     on_exit(fn ->
-      if is_nil(prev), do: Application.delete_env(:agent_runtime, ModelResolver), else: Application.put_env(:agent_runtime, ModelResolver, prev)
+      if is_nil(prev),
+        do: Application.delete_env(:agent_runtime, ModelResolver),
+        else: Application.put_env(:agent_runtime, ModelResolver, prev)
     end)
 
     :ok

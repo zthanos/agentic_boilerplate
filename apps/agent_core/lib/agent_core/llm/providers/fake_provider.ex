@@ -18,7 +18,7 @@ defmodule AgentCore.Llm.Providers.FakeProvider do
             |> Enum.reverse()
             |> Enum.find(fn m -> m[:role] in [:user, :system] and is_binary(m[:content]) end)
 
-          "FAKE: " <> (last && last[:content] || "")
+          "FAKE: " <> ((last && last[:content]) || "")
       end
 
     {:ok,

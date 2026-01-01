@@ -20,17 +20,17 @@ defmodule AgentWebWeb.LlmExecuteController do
     "phase": "draft|critique|revise|final" // optional
   }
   """
-  operation :execute,
+  operation(:execute,
     summary: "Execute an LLM call",
     request_body: {"Execute request", "application/json", Schemas.LlmExecuteRequest},
     responses: [
       ok: {"OK", "application/json", Schemas.LlmExecuteResponseOk},
       bad_request: {"Bad Request", "application/json", Schemas.LlmExecuteResponseError},
       not_found: {"Not Found", "application/json", Schemas.LlmExecuteResponseError},
-      internal_server_error: {"Internal Server Error", "application/json", Schemas.LlmExecuteResponseError}
+      internal_server_error:
+        {"Internal Server Error", "application/json", Schemas.LlmExecuteResponseError}
     ]
-
-
+  )
 
   def execute(conn, %{"profile_id" => profile_id, "input" => input} = params) do
     overrides = Map.get(params, "overrides", %{})
@@ -50,7 +50,14 @@ defmodule AgentWebWeb.LlmExecuteController do
     case InputMapper.to_runtime(input) do
       {:ok, runtime_input} ->
         case Executor.execute(profile, overrides, runtime_input, exec_meta) do
-          {:ok, %{response: resp, run_id: run_id, trace_id: trace_id, fingerprint: fp, latency_ms: latency}} ->
+          {:ok,
+           %{
+             response: resp,
+             run_id: run_id,
+             trace_id: trace_id,
+             fingerprint: fp,
+             latency_ms: latency
+           }} ->
             json(conn, %{
               "status" => "ok",
               "run_id" => run_id,
@@ -62,7 +69,14 @@ defmodule AgentWebWeb.LlmExecuteController do
               "usage" => fetch_field(resp, [:usage, "usage"])
             })
 
-          {:error, %{reason: reason, run_id: run_id, trace_id: trace_id, fingerprint: fp, latency_ms: latency}} ->
+          {:error,
+           %{
+             reason: reason,
+             run_id: run_id,
+             trace_id: trace_id,
+             fingerprint: fp,
+             latency_ms: latency
+           }} ->
             conn
             |> put_status(:bad_request)
             |> json(%{
@@ -173,7 +187,14 @@ defmodule AgentWebWeb.LlmExecuteController do
             end
 
             # result = Executor.execute_stream(profile, overrides, runtime_input, exec_meta, on_chunk)
-            result = AgentRuntime.Llm.PlanExecutor.execute_plan_stream(profile, overrides, input, exec_meta, on_chunk)
+            result =
+              AgentRuntime.Llm.PlanExecutor.execute_plan_stream(
+                profile,
+                overrides,
+                input,
+                exec_meta,
+                on_chunk
+              )
 
             send(parent, {:sse_result, result})
             :ok
@@ -181,7 +202,9 @@ defmodule AgentWebWeb.LlmExecuteController do
 
         # Optional: notify client we opened the stream
         case send_event.(conn, "open", %{"status" => "ok"}) do
-          {:ok, conn2} -> sse_loop(conn2, send_event, task.ref)
+          {:ok, conn2} ->
+            sse_loop(conn2, send_event, task.ref)
+
           {:error, _reason} ->
             Task.shutdown(task, :brutal_kill)
             conn
@@ -205,7 +228,6 @@ defmodule AgentWebWeb.LlmExecuteController do
       |> json(%{"status" => "error", "error" => %{"message" => Exception.message(e)}})
   end
 
-
   # ---- Streaming receive loop (controller owns conn & chunk) ----
 
   defp sse_loop(conn, send_event, task_ref) do
@@ -220,7 +242,15 @@ defmodule AgentWebWeb.LlmExecuteController do
             conn
         end
 
-      {:sse_result, {:ok, %{run_id: run_id, trace_id: trace_id, fingerprint: fp, latency_ms: latency, response: resp}}} ->
+      {:sse_result,
+       {:ok,
+        %{
+          run_id: run_id,
+          trace_id: trace_id,
+          fingerprint: fp,
+          latency_ms: latency,
+          response: resp
+        }}} ->
         _ =
           send_event.(conn, "done", %{
             "run_id" => run_id,
@@ -232,7 +262,15 @@ defmodule AgentWebWeb.LlmExecuteController do
 
         conn
 
-      {:sse_result, {:error, %{reason: reason, run_id: run_id, trace_id: trace_id, fingerprint: fp, latency_ms: latency}}} ->
+      {:sse_result,
+       {:error,
+        %{
+          reason: reason,
+          run_id: run_id,
+          trace_id: trace_id,
+          fingerprint: fp,
+          latency_ms: latency
+        }}} ->
         _ =
           send_event.(conn, "error", %{
             "run_id" => run_id,
@@ -244,24 +282,23 @@ defmodule AgentWebWeb.LlmExecuteController do
 
         conn
 
-        {:DOWN, ^task_ref, :process, _pid, :normal} ->
-          # Worker exited normally AFTER sending sse_result
-          conn
+      {:DOWN, ^task_ref, :process, _pid, :normal} ->
+        # Worker exited normally AFTER sending sse_result
+        conn
 
-        {:DOWN, ^task_ref, :process, _pid, :shutdown} ->
-          conn
+      {:DOWN, ^task_ref, :process, _pid, :shutdown} ->
+        conn
 
-        {:DOWN, ^task_ref, :process, _pid, reason} ->
-          _ =
-            send_event.(conn, "error", %{
-              "error" => %{
-                "message" => "stream_worker_crashed",
-                "detail" => inspect(reason)
-              }
-            })
+      {:DOWN, ^task_ref, :process, _pid, reason} ->
+        _ =
+          send_event.(conn, "error", %{
+            "error" => %{
+              "message" => "stream_worker_crashed",
+              "detail" => inspect(reason)
+            }
+          })
 
-          conn
-
+        conn
     after
       60_000 ->
         # Keep-alive ping so intermediaries don't kill the connection

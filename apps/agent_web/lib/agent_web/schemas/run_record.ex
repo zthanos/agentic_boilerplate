@@ -67,5 +67,4 @@ defmodule AgentWeb.Schemas.RunRecord do
     |> validate_inclusion(:status, ["created", "started", "finished", "failed"])
     |> validate_length(:fingerprint, is: 64)
   end
-
 end

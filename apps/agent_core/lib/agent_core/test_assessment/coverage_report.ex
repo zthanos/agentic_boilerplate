@@ -4,12 +4,12 @@ defmodule AgentCore.TestAssessment.CoverageReport do
   """
 
   @type t :: %__MODULE__{
-    total_lines: integer(),
-    covered_lines: integer(),
-    coverage_percentage: float(),
-    uncovered_functions: [String.t()],
-    test_coverage_map: %{String.t() => [String.t()]}
-  }
+          total_lines: integer(),
+          covered_lines: integer(),
+          coverage_percentage: float(),
+          uncovered_functions: [String.t()],
+          test_coverage_map: %{String.t() => [String.t()]}
+        }
 
   defstruct [
     :total_lines,

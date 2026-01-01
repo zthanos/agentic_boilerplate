@@ -15,15 +15,15 @@ defmodule AgentCore.TestAssessment.AssessmentReport do
   }
 
   @type t :: %__MODULE__{
-    summary: ReportSummary.t(),
-    test_categories: %{String.t() => TestCategory.t()},
-    redundancy_findings: [RedundancyFinding.t()],
-    coverage_gaps: [CoverageGap.t()],
-    config_issues: [ConfigIssue.t()],
-    recommendations: [Recommendation.t()],
-    phoenix_analysis: map(),
-    generated_at: DateTime.t()
-  }
+          summary: ReportSummary.t(),
+          test_categories: %{String.t() => TestCategory.t()},
+          redundancy_findings: [RedundancyFinding.t()],
+          coverage_gaps: [CoverageGap.t()],
+          config_issues: [ConfigIssue.t()],
+          recommendations: [Recommendation.t()],
+          phoenix_analysis: map(),
+          generated_at: DateTime.t()
+        }
 
   defstruct [
     :summary,

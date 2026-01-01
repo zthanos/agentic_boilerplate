@@ -91,6 +91,7 @@ defmodule AgentCore.TestAssessment do
 
       # Step 9: Generate recommendations
       progress_callback.("Generating recommendations...")
+
       analysis_results = %{
         test_files: test_files,
         parsed_tests: parsed_tests,
@@ -121,7 +122,6 @@ defmodule AgentCore.TestAssessment do
       Logger.info("Test assessment completed successfully for #{umbrella_path}")
 
       {:ok, organized_report}
-
     rescue
       error ->
         Logger.error("Test assessment failed with error: #{inspect(error)}")
@@ -136,9 +136,9 @@ defmodule AgentCore.TestAssessment do
   Convenience function that combines assessment and export in one call.
   """
   @spec assess_and_export(String.t(), String.t(), atom(), keyword()) ::
-    {:ok, AssessmentReport.t()} | {:error, term()}
+          {:ok, AssessmentReport.t()} | {:error, term()}
   def assess_and_export(umbrella_path, output_file, format \\ :text, opts \\ []) do
-    opts_with_export = Keyword.merge(opts, [output_file: output_file, format: format])
+    opts_with_export = Keyword.merge(opts, output_file: output_file, format: format)
     assess_test_suite(umbrella_path, opts_with_export)
   end
 
@@ -161,13 +161,15 @@ defmodule AgentCore.TestAssessment do
           {:ok, _config_files} ->
             # Try to discover apps to validate umbrella structure
             apps_path = Path.join(umbrella_path, "apps")
+
             if File.exists?(apps_path) do
               case File.ls(apps_path) do
                 {:ok, entries} ->
-                  apps = entries
-                        |> Enum.map(&Path.join(apps_path, &1))
-                        |> Enum.filter(&File.dir?/1)
-                        |> Enum.filter(&has_mix_file?/1)
+                  apps =
+                    entries
+                    |> Enum.map(&Path.join(apps_path, &1))
+                    |> Enum.filter(&File.dir?/1)
+                    |> Enum.filter(&has_mix_file?/1)
 
                   if length(apps) > 0 do
                     {:ok, apps}
@@ -197,30 +199,42 @@ defmodule AgentCore.TestAssessment do
 
   defp discover_files_with_recovery(umbrella_path) do
     # Discover test files with fallback
-    test_files = case FileDiscovery.discover_test_files(umbrella_path) do
-      {:ok, files} ->
-        Logger.info("Discovered #{length(files)} test files")
-        files
-      {:error, reason} ->
-        Logger.warning("Failed to discover test files: #{inspect(reason)}, continuing with empty list")
-        []
-    end
+    test_files =
+      case FileDiscovery.discover_test_files(umbrella_path) do
+        {:ok, files} ->
+          Logger.info("Discovered #{length(files)} test files")
+          files
+
+        {:error, reason} ->
+          Logger.warning(
+            "Failed to discover test files: #{inspect(reason)}, continuing with empty list"
+          )
+
+          []
+      end
 
     # Discover config files with fallback
-    config_files = case FileDiscovery.discover_config_files(umbrella_path) do
-      {:ok, files} ->
-        Logger.info("Discovered #{length(files)} config files")
-        files
-      {:error, reason} ->
-        Logger.warning("Failed to discover config files: #{inspect(reason)}, continuing with empty list")
-        []
-    end
+    config_files =
+      case FileDiscovery.discover_config_files(umbrella_path) do
+        {:ok, files} ->
+          Logger.info("Discovered #{length(files)} config files")
+          files
+
+        {:error, reason} ->
+          Logger.warning(
+            "Failed to discover config files: #{inspect(reason)}, continuing with empty list"
+          )
+
+          []
+      end
 
     # Count apps analyzed
-    apps_analyzed = case validate_umbrella_project(umbrella_path) do
-      {:ok, apps} -> length(apps)
-      {:error, _reason} -> 1  # Assume single app
-    end
+    apps_analyzed =
+      case validate_umbrella_project(umbrella_path) do
+        {:ok, apps} -> length(apps)
+        # Assume single app
+        {:error, _reason} -> 1
+      end
 
     {test_files, config_files, apps_analyzed}
   end
@@ -236,6 +250,7 @@ defmodule AgentCore.TestAssessment do
       case TestParser.parse_test_file(test_file.path) do
         {:ok, parsed_tests} ->
           parsed_tests
+
         {:error, reason} ->
           Logger.warning("Failed to parse test file #{test_file.path}: #{inspect(reason)}")
           []
@@ -271,39 +286,45 @@ defmodule AgentCore.TestAssessment do
     redundancy_findings = []
 
     # Detect redundant coverage
-    redundancy_findings = try do
-      coverage_redundancies = RedundancyDetector.detect_redundant_coverage(parsed_tests, coverage_report)
-      redundancy_findings ++ coverage_redundancies
-    rescue
-      error ->
-        Logger.warning("Failed to detect redundant coverage: #{inspect(error)}")
-        redundancy_findings
-    end
+    redundancy_findings =
+      try do
+        coverage_redundancies =
+          RedundancyDetector.detect_redundant_coverage(parsed_tests, coverage_report)
+
+        redundancy_findings ++ coverage_redundancies
+      rescue
+        error ->
+          Logger.warning("Failed to detect redundant coverage: #{inspect(error)}")
+          redundancy_findings
+      end
 
     # Detect similar logic
-    redundancy_findings = try do
-      logic_redundancies = RedundancyDetector.detect_similar_logic(parsed_tests)
-      redundancy_findings ++ logic_redundancies
-    rescue
-      error ->
-        Logger.warning("Failed to detect similar logic: #{inspect(error)}")
-        redundancy_findings
-    end
+    redundancy_findings =
+      try do
+        logic_redundancies = RedundancyDetector.detect_similar_logic(parsed_tests)
+        redundancy_findings ++ logic_redundancies
+      rescue
+        error ->
+          Logger.warning("Failed to detect similar logic: #{inspect(error)}")
+          redundancy_findings
+      end
 
     # Handle LiveView redundancy
-    redundancy_findings = try do
-      liveview_tests = Enum.filter(parsed_tests, &is_liveview_test?/1)
-      if length(liveview_tests) > 0 do
-        liveview_redundancies = RedundancyDetector.handle_liveview_redundancy(liveview_tests)
-        redundancy_findings ++ liveview_redundancies
-      else
-        redundancy_findings
+    redundancy_findings =
+      try do
+        liveview_tests = Enum.filter(parsed_tests, &is_liveview_test?/1)
+
+        if length(liveview_tests) > 0 do
+          liveview_redundancies = RedundancyDetector.handle_liveview_redundancy(liveview_tests)
+          redundancy_findings ++ liveview_redundancies
+        else
+          redundancy_findings
+        end
+      rescue
+        error ->
+          Logger.warning("Failed to handle LiveView redundancy: #{inspect(error)}")
+          redundancy_findings
       end
-    rescue
-      error ->
-        Logger.warning("Failed to handle LiveView redundancy: #{inspect(error)}")
-        redundancy_findings
-    end
 
     redundancy_findings
   end
@@ -312,44 +333,48 @@ defmodule AgentCore.TestAssessment do
     config_issues = []
 
     # Validate mix dependencies
-    config_issues = try do
-      mix_issues = ConfigValidator.validate_mix_dependencies(umbrella_path)
-      config_issues ++ mix_issues
-    rescue
-      error ->
-        Logger.warning("Failed to validate mix dependencies: #{inspect(error)}")
-        config_issues
-    end
+    config_issues =
+      try do
+        mix_issues = ConfigValidator.validate_mix_dependencies(umbrella_path)
+        config_issues ++ mix_issues
+      rescue
+        error ->
+          Logger.warning("Failed to validate mix dependencies: #{inspect(error)}")
+          config_issues
+      end
 
     # Validate test configs
-    config_issues = try do
-      test_config_issues = ConfigValidator.validate_test_configs(umbrella_path)
-      config_issues ++ test_config_issues
-    rescue
-      error ->
-        Logger.warning("Failed to validate test configs: #{inspect(error)}")
-        config_issues
-    end
+    config_issues =
+      try do
+        test_config_issues = ConfigValidator.validate_test_configs(umbrella_path)
+        config_issues ++ test_config_issues
+      rescue
+        error ->
+          Logger.warning("Failed to validate test configs: #{inspect(error)}")
+          config_issues
+      end
 
     # Validate Phoenix configs
-    config_issues = try do
-      phoenix_issues = ConfigValidator.validate_phoenix_configs(umbrella_path)
-      config_issues ++ phoenix_issues
-    rescue
-      error ->
-        Logger.warning("Failed to validate Phoenix configs: #{inspect(error)}")
-        config_issues
-    end
+    config_issues =
+      try do
+        phoenix_issues = ConfigValidator.validate_phoenix_configs(umbrella_path)
+        config_issues ++ phoenix_issues
+      rescue
+        error ->
+          Logger.warning("Failed to validate Phoenix configs: #{inspect(error)}")
+          config_issues
+      end
 
     # Report config mismatches
-    config_issues = try do
-      mismatch_issues = ConfigValidator.report_config_mismatches(umbrella_path)
-      config_issues ++ mismatch_issues
-    rescue
-      error ->
-        Logger.warning("Failed to report config mismatches: #{inspect(error)}")
-        config_issues
-    end
+    config_issues =
+      try do
+        mismatch_issues = ConfigValidator.report_config_mismatches(umbrella_path)
+        config_issues ++ mismatch_issues
+      rescue
+        error ->
+          Logger.warning("Failed to report config mismatches: #{inspect(error)}")
+          config_issues
+      end
 
     config_issues
   end
@@ -370,11 +395,32 @@ defmodule AgentCore.TestAssessment do
     rescue
       error ->
         Logger.warning("Failed to analyze Phoenix features: #{inspect(error)}")
+
         %{
-          liveview_analysis: %{tested_interactions: [], untested_interactions: [], interaction_coverage: 0.0, recommendations: []},
-          form_validation_analysis: %{tested_validations: [], untested_validations: [], validation_coverage: 0.0, coverage_gaps: []},
-          component_analysis: %{tested_components: [], untested_components: [], component_coverage: 0.0, coverage_gaps: []},
-          property_test_analysis: %{parser_opportunities: [], transformation_opportunities: [], existing_property_tests: [], recommendations: []},
+          liveview_analysis: %{
+            tested_interactions: [],
+            untested_interactions: [],
+            interaction_coverage: 0.0,
+            recommendations: []
+          },
+          form_validation_analysis: %{
+            tested_validations: [],
+            untested_validations: [],
+            validation_coverage: 0.0,
+            coverage_gaps: []
+          },
+          component_analysis: %{
+            tested_components: [],
+            untested_components: [],
+            component_coverage: 0.0,
+            coverage_gaps: []
+          },
+          property_test_analysis: %{
+            parser_opportunities: [],
+            transformation_opportunities: [],
+            existing_property_tests: [],
+            recommendations: []
+          },
           overall_phoenix_coverage: 0.0,
           phoenix_recommendations: []
         }
@@ -408,9 +454,12 @@ defmodule AgentCore.TestAssessment do
     alias AgentCore.TestAssessment.CoverageReport
 
     %CoverageReport{
-      total_lines: length(parsed_tests) * 50,  # Rough estimate
-      covered_lines: length(parsed_tests) * 30,  # Rough estimate
-      coverage_percentage: 60.0,  # Conservative estimate
+      # Rough estimate
+      total_lines: length(parsed_tests) * 50,
+      # Rough estimate
+      covered_lines: length(parsed_tests) * 30,
+      # Conservative estimate
+      coverage_percentage: 60.0,
       uncovered_functions: [],
       test_coverage_map: %{}
     }

@@ -59,11 +59,12 @@ defmodule AgentCore.TestAssessment.CLI do
     verbose = Keyword.get(opts, :verbose, false)
     validate_only = Keyword.get(opts, :validate_only, false)
 
-    progress_callback = if verbose do
-      &verbose_progress/1
-    else
-      &simple_progress/1
-    end
+    progress_callback =
+      if verbose do
+        &verbose_progress/1
+      else
+        &simple_progress/1
+      end
 
     IO.puts("Test Assessment System")
     IO.puts("Analyzing: #{project_path}")
@@ -89,18 +90,19 @@ defmodule AgentCore.TestAssessment.CLI do
   end
 
   defp parse_assessment_args(args) do
-    {opts, remaining_args, invalid} = OptionParser.parse(args,
-      switches: [
-        format: :string,
-        output: :string,
-        verbose: :boolean,
-        validate_only: :boolean
-      ],
-      aliases: [
-        f: :format,
-        o: :output
-      ]
-    )
+    {opts, remaining_args, invalid} =
+      OptionParser.parse(args,
+        switches: [
+          format: :string,
+          output: :string,
+          verbose: :boolean,
+          validate_only: :boolean
+        ],
+        aliases: [
+          f: :format,
+          o: :output
+        ]
+      )
 
     cond do
       length(invalid) > 0 ->
@@ -110,19 +112,21 @@ defmodule AgentCore.TestAssessment.CLI do
         {:error, "Too many arguments. Expected at most one path argument."}
 
       true ->
-        project_path = case remaining_args do
-          [path] -> Path.expand(path)
-          [] -> File.cwd!()
-        end
+        project_path =
+          case remaining_args do
+            [path] -> Path.expand(path)
+            [] -> File.cwd!()
+          end
 
         # Validate format
-        format = case opts[:format] do
-          nil -> :text
-          "text" -> :text
-          "json" -> :json
-          "html" -> :html
-          invalid -> {:error, "Invalid format: #{invalid}. Valid formats: text, json, html"}
-        end
+        format =
+          case opts[:format] do
+            nil -> :text
+            "text" -> :text
+            "json" -> :json
+            "html" -> :html
+            invalid -> {:error, "Invalid format: #{invalid}. Valid formats: text, json, html"}
+          end
 
         parsed_opts = [
           format: format,
@@ -163,7 +167,9 @@ defmodule AgentCore.TestAssessment.CLI do
   defp run_full_assessment_cli(project_path, format, output_file, progress_callback) do
     # Validate first
     case TestAssessment.validate_umbrella_project(project_path) do
-      {:ok, _apps} -> :ok
+      {:ok, _apps} ->
+        :ok
+
       {:error, reason} ->
         IO.puts(:stderr, "✗ Invalid project: #{format_validation_error(reason)}")
         {:error, reason}
@@ -273,10 +279,11 @@ defmodule AgentCore.TestAssessment.CLI do
 
   defp print_version do
     # Get version from mix.exs or default
-    version = case Application.spec(:agent_core, :vsn) do
-      nil -> "dev"
-      vsn -> List.to_string(vsn)
-    end
+    version =
+      case Application.spec(:agent_core, :vsn) do
+        nil -> "dev"
+        vsn -> List.to_string(vsn)
+      end
 
     IO.puts("Test Assessment System v#{version}")
   end

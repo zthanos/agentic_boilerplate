@@ -17,7 +17,9 @@ defmodule AgentRuntime.Flows.Requirements.ParserTest do
           "status" => "proposed",
           "actors" => ["end_user"],
           "systems" => ["portal"],
-          "acceptance_criteria" => ["Given valid credentials, when login, then access is granted."]
+          "acceptance_criteria" => [
+            "Given valid credentials, when login, then access is granted."
+          ]
         }
       ],
       "non_functional_requirements" => [
@@ -51,7 +53,12 @@ defmodule AgentRuntime.Flows.Requirements.ParserTest do
   test "additional properties are rejected" do
     bad =
       %{
-        "meta" => %{"version" => "1.0", "language" => "en", "confidence" => 0.5, "extra" => "nope"},
+        "meta" => %{
+          "version" => "1.0",
+          "language" => "en",
+          "confidence" => 0.5,
+          "extra" => "nope"
+        },
         "actors" => [],
         "systems" => [],
         "functional_requirements" => [],

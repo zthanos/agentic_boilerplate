@@ -43,7 +43,10 @@ defmodule AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStepTest do
       %PlanContext{
         profile: nil,
         overrides: %{},
-        input: %{"type" => "chat", "messages" => [%{"role" => "user", "content" => "do you know my name?"}]},
+        input: %{
+          "type" => "chat",
+          "messages" => [%{"role" => "user", "content" => "do you know my name?"}]
+        },
         exec_meta: %{"conversation_id" => "conv-1"},
         decisions: %{},
         augmented_messages: []

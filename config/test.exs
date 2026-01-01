@@ -10,7 +10,6 @@ config :agent_web, AgentWeb.Repo,
   pool_size: 5,
   types: AgentWeb.PostgrexTypes
 
-
 # -----------------------------------------------------------------------------
 # agent_web Endpoint (no server in test)
 # -----------------------------------------------------------------------------
@@ -28,16 +27,12 @@ config :phoenix, :plug_init_mode, :runtime
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
-
 # -----------------------------------------------------------------------------
 # agent_core LLM wiring (tests)
 # -----------------------------------------------------------------------------
-config :agent_core, AgentCore.Llm.Runs,
-  store: AgentCore.Llm.RunStore.Ecto
+config :agent_core, AgentCore.Llm.Runs, store: AgentCore.Llm.RunStore.Ecto
 
-config :agent_core, AgentCore.Llm.ProviderRouter,
-  openai: AgentCore.Llm.Providers.FakeProvider
-
+config :agent_core, AgentCore.Llm.ProviderRouter, openai: AgentCore.Llm.Providers.FakeProvider
 
 config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
   openai_compatible: [

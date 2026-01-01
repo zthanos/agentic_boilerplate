@@ -11,7 +11,6 @@ defmodule AgentWeb.Llm.RunStoreEcto do
   alias AgentWeb.Support.Serialization
   alias AgentCore.Llm.RunView
 
-
   # -----------------------
   # Public API (RunStore)
   # -----------------------
@@ -262,7 +261,6 @@ defmodule AgentWeb.Llm.RunStoreEcto do
   defp normalize_error({type, value}), do: %{type: inspect(type), value: inspect(value)}
   defp normalize_error(other), do: %{type: "error", value: inspect(other)}
 
-
   defp to_view(%RunRecord{} = r) do
     %RunView{
       # identity / chaining
@@ -311,7 +309,9 @@ defmodule AgentWeb.Llm.RunStoreEcto do
       if String.length(uuid) == 32 and String.match?(uuid, ~r/^[0-9a-fA-F]+$/) do
         # Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
         try do
-          <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4), e::binary-size(12)>> = uuid
+          <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
+            e::binary-size(12)>> = uuid
+
           "#{a}-#{b}-#{c}-#{d}-#{e}"
         rescue
           MatchError -> uuid
@@ -327,5 +327,4 @@ defmodule AgentWeb.Llm.RunStoreEcto do
   end
 
   defp normalize_uuid(other), do: other
-
 end

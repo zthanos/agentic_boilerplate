@@ -73,7 +73,11 @@ defmodule AgentCore.Llm.RunStore.Memory do
   def mark_failed(run_id, error, outcome \\ %{}) when is_binary(run_id) and is_map(outcome) do
     update(run_id, fn rec ->
       rec
-      |> Map.merge(%{status: "failed", finished_at: DateTime.utc_now(), error: normalize_error(error)})
+      |> Map.merge(%{
+        status: "failed",
+        finished_at: DateTime.utc_now(),
+        error: normalize_error(error)
+      })
       |> apply_outcome(outcome)
     end)
   end

@@ -76,7 +76,6 @@ defmodule AgentWeb.MixProject do
       {:ex_machina, "~> 2.8", only: :test},
       {:mox, "~> 1.2", only: :test},
       {:stream_data, "~> 1.0", only: :test}
-
     ]
   end
 

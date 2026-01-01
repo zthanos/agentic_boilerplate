@@ -1,5 +1,4 @@
 defmodule AgentCore.Llm.Provider do
-
   alias __MODULE__
 
   @enforce_keys [:type, :base_url]
@@ -14,13 +13,12 @@ defmodule AgentCore.Llm.Provider do
   ]
 
   @type t :: %Provider{
-    type: atom(),
-    base_url: String.t(),
-    api_key: String.t() | nil,
-    default_headers: map() | nil,
-    request_timeout_ms: integer(),
-    retries: integer(),
-    retry_backoff_ms: integer()
-  }
-
+          type: atom(),
+          base_url: String.t(),
+          api_key: String.t() | nil,
+          default_headers: map() | nil,
+          request_timeout_ms: integer(),
+          retries: integer(),
+          retry_backoff_ms: integer()
+        }
 end

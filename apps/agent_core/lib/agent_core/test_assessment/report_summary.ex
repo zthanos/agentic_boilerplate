@@ -6,14 +6,14 @@ defmodule AgentCore.TestAssessment.ReportSummary do
   @derive Jason.Encoder
 
   @type t :: %__MODULE__{
-    total_tests: integer(),
-    total_test_files: integer(),
-    apps_analyzed: integer(),
-    redundant_tests_found: integer(),
-    coverage_gaps_found: integer(),
-    config_issues_found: integer(),
-    overall_score: float()
-  }
+          total_tests: integer(),
+          total_test_files: integer(),
+          apps_analyzed: integer(),
+          redundant_tests_found: integer(),
+          coverage_gaps_found: integer(),
+          config_issues_found: integer(),
+          overall_score: float()
+        }
 
   defstruct [
     :total_tests,

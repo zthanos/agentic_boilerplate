@@ -25,7 +25,9 @@ defmodule AgentRuntime.TestSupport.JsonProvider do
           "status" => "proposed",
           "actors" => ["end_user"],
           "systems" => ["portal"],
-          "acceptance_criteria" => ["Given valid credentials, when login, then access is granted."]
+          "acceptance_criteria" => [
+            "Given valid credentials, when login, then access is granted."
+          ]
         }
       ],
       "non_functional_requirements" => [

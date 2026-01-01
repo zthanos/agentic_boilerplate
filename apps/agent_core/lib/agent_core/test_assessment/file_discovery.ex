@@ -8,7 +8,14 @@ defmodule AgentCore.TestAssessment.FileDiscovery do
   alias AgentCore.TestAssessment.TestFile
 
   @test_file_patterns ["*_test.exs", "*test.exs"]
-  @config_file_patterns ["mix.exs", "test.exs", "config.exs", "dev.exs", "prod.exs", "runtime.exs"]
+  @config_file_patterns [
+    "mix.exs",
+    "test.exs",
+    "config.exs",
+    "dev.exs",
+    "prod.exs",
+    "runtime.exs"
+  ]
 
   @doc """
   Discovers all test files in the given umbrella project path.
@@ -157,6 +164,7 @@ defmodule AgentCore.TestAssessment.FileDiscovery do
 
     # Check for config files in config subdirectory
     config_path = Path.join(base_path, "config")
+
     config_dir_configs =
       case File.exists?(config_path) do
         true -> find_config_files_in_directory(config_path, context)
@@ -171,23 +179,31 @@ defmodule AgentCore.TestAssessment.FileDiscovery do
     @config_file_patterns
     |> Enum.flat_map(fn pattern ->
       file_path = Path.join(directory, pattern)
+
       case File.exists?(file_path) do
         true ->
           case File.stat(file_path) do
             {:ok, %File.Stat{size: size, mtime: mtime}} ->
-              last_modified = mtime |> NaiveDateTime.from_erl!() |> DateTime.from_naive!("Etc/UTC")
-              [%{
-                path: file_path,
-                context: context,
-                filename: pattern,
-                size: size,
-                last_modified: last_modified
-              }]
+              last_modified =
+                mtime |> NaiveDateTime.from_erl!() |> DateTime.from_naive!("Etc/UTC")
+
+              [
+                %{
+                  path: file_path,
+                  context: context,
+                  filename: pattern,
+                  size: size,
+                  last_modified: last_modified
+                }
+              ]
+
             {:error, reason} ->
               Logger.warning("Failed to stat config file #{file_path}: #{inspect(reason)}")
               []
           end
-        false -> []
+
+        false ->
+          []
       end
     end)
   end

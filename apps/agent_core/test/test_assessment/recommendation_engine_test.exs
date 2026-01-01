@@ -177,7 +177,10 @@ defmodule AgentCore.TestAssessment.RecommendationEngineTest do
           line_number: 10,
           test_type: :test,
           setup_blocks: [],
-          assertions: ["assert Phoenix.View.render(view, template)", "live_redirect(socket, to: path)"],
+          assertions: [
+            "assert Phoenix.View.render(view, template)",
+            "live_redirect(socket, to: path)"
+          ],
           dependencies: [],
           complexity_score: 2.0
         }

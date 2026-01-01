@@ -14,15 +14,19 @@ defmodule AgentRuntime.Llm.ProviderConfig do
 
   @spec openai_compatible(keyword()) :: openai_compatible_config
   def openai_compatible(overrides \\ []) when is_list(overrides) do
+    # optional backward-compat
     base_url =
       overrides[:base_url] ||
         System.get_env("OPENAI_BASE_URL") ||
-        System.get_env("OPENAI_COMPAT_BASE_URL") || # optional backward-compat
+        System.get_env("OPENAI_COMPAT_BASE_URL") ||
         @default_base_url
 
     api_key =
       overrides
-      |> Keyword.get(:api_key, System.get_env("OPENAI_API_KEY") || System.get_env("OPENAI_COMPAT_API_KEY"))
+      |> Keyword.get(
+        :api_key,
+        System.get_env("OPENAI_API_KEY") || System.get_env("OPENAI_COMPAT_API_KEY")
+      )
       |> normalize_optional_string()
 
     timeout_ms =
@@ -47,8 +51,12 @@ defmodule AgentRuntime.Llm.ProviderConfig do
 
   defp env_int(name) do
     case System.get_env(name) do
-      nil -> nil
-      "" -> nil
+      nil ->
+        nil
+
+      "" ->
+        nil
+
       v ->
         case Integer.parse(v) do
           {i, ""} when i > 0 -> i

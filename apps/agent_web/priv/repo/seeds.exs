@@ -150,7 +150,7 @@ plan =
       }
     },
     steps: [
-      "AgentRuntime.Llm.Plan.Steps.AssessNeedForHistoryStep",
+      "AgentRuntime.Llm.Plan.Steps.WorkflowHistoryStep",
       "AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStep",
       "AgentRuntime.Llm.Plan.Steps.AssessNeedForClarificationStep",
       "AgentRuntime.Llm.Plan.Steps.ExecutePromptStep"

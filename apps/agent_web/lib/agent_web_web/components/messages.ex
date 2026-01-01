@@ -18,7 +18,6 @@ defmodule AgentWebWeb.MessagesComponent do
       <div class="p-5 space-y-6">
         <%= for m <- @messages do %>
           <div id={"message-#{m["id"] || :rand.uniform(10000)}"} class={bubble_class(m["role"])}>
-
             <!-- Message Header -->
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-3">
@@ -31,7 +30,7 @@ defmodule AgentWebWeb.MessagesComponent do
                     <% end %>
                   </span>
                 </div>
-
+                
                 <div>
                   <span class="text-sm font-semibold capitalize">{role_display_name(m["role"])}</span>
                   <div class="text-xs text-base-content/70 flex items-center gap-2">
@@ -81,12 +80,12 @@ defmodule AgentWebWeb.MessagesComponent do
                 <.assistant_icon class="w-5 h-5 text-base-100" />
               </div>
             </div>
-
+            
             <div class="chat-header mb-2">
               <span class="font-semibold">Assistant</span>
               <time class="text-xs opacity-50 ml-2">Streaming...</time>
             </div>
-
+            
             <div class="chat-bubble chat-bubble-primary">
               <!-- Streaming content with markdown -->
               <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-base-300/50 prose-code:bg-base-300/50">
@@ -95,13 +94,13 @@ defmodule AgentWebWeb.MessagesComponent do
               <!-- Typing indicator -->
               <div class="flex space-x-1 mt-3">
                 <div class="w-2 h-2 bg-primary-content rounded-full animate-bounce"></div>
-
+                
                 <div
                   class="w-2 h-2 bg-primary-content rounded-full animate-bounce"
                   style="animation-delay: 0.2s"
                 >
                 </div>
-
+                
                 <div
                   class="w-2 h-2 bg-primary-content rounded-full animate-bounce"
                   style="animation-delay: 0.4s"

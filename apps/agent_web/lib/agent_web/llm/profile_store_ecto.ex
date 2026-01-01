@@ -7,7 +7,6 @@ defmodule AgentWeb.Llm.ProfileStoreEcto do
   alias AgentCore.Llm.LLMProfile
   alias AgentCore.RunStore.Serialization
 
-
   @spec put(LLMProfile.t()) :: {:ok, String.t()} | {:error, Ecto.Changeset.t()}
   def put(%LLMProfile{} = profile) do
     attrs = %{
@@ -58,7 +57,6 @@ defmodule AgentWeb.Llm.ProfileStoreEcto do
     end
   end
 
-
   @spec list(keyword()) :: [LLMProfile.t()]
   def list(opts \\ []) do
     profiles =
@@ -99,7 +97,4 @@ defmodule AgentWeb.Llm.ProfileStoreEcto do
   rescue
     ArgumentError -> s
   end
-
-
-
 end

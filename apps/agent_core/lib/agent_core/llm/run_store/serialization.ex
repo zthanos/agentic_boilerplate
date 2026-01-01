@@ -55,6 +55,7 @@ defmodule AgentCore.RunStore.Serialization do
         sorted
     end
   end
+
   def deep_sort(value), do: value
 
   # Converts a term into a JSON-safe structure:
@@ -97,8 +98,6 @@ defmodule AgentCore.RunStore.Serialization do
         inspect(term)
     end
   end
-
-
 
   defp is_scalar(v) when is_binary(v) or is_number(v) or is_boolean(v) or is_nil(v), do: true
   defp is_scalar(_), do: false

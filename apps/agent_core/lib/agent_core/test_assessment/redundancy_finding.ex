@@ -6,12 +6,12 @@ defmodule AgentCore.TestAssessment.RedundancyFinding do
   @derive Jason.Encoder
 
   @type t :: %__MODULE__{
-    test_names: [String.t()],
-    redundancy_type: :identical_coverage | :similar_logic | :duplicate_assertions,
-    confidence_score: float(),
-    recommended_action: String.t(),
-    justification: String.t()
-  }
+          test_names: [String.t()],
+          redundancy_type: :identical_coverage | :similar_logic | :duplicate_assertions,
+          confidence_score: float(),
+          recommended_action: String.t(),
+          justification: String.t()
+        }
 
   defstruct [
     :test_names,

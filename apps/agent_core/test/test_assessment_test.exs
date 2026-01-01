@@ -2,6 +2,7 @@ defmodule AgentCore.TestAssessmentTest do
   use ExUnit.Case, async: true
 
   alias AgentCore.TestAssessment
+
   alias AgentCore.TestAssessment.{
     TestFile,
     ParsedTest,
@@ -91,11 +92,13 @@ defmodule AgentCore.TestAssessmentTest do
       assert is_struct(report, AssessmentReport)
       assert report.summary.total_tests == 0
       assert report.summary.total_test_files == 0
-      assert length(report.config_issues) > 0  # Should have config issues for invalid path
+      # Should have config issues for invalid path
+      assert length(report.config_issues) > 0
     end
 
     test "validate_umbrella_project returns error for non-existent path" do
-      assert {:error, :path_not_found} = TestAssessment.validate_umbrella_project("/non/existent/path")
+      assert {:error, :path_not_found} =
+               TestAssessment.validate_umbrella_project("/non/existent/path")
     end
 
     test "validate_umbrella_project returns error for non-directory" do
@@ -125,7 +128,8 @@ defmodule AgentCore.TestAssessmentTest do
       File.mkdir_p!(temp_dir)
 
       try do
-        assert {:error, {:invalid_project_structure, :not_elixir_project}} = TestAssessment.validate_umbrella_project(temp_dir)
+        assert {:error, {:invalid_project_structure, :not_elixir_project}} =
+                 TestAssessment.validate_umbrella_project(temp_dir)
       after
         File.rm_rf!(temp_dir)
       end

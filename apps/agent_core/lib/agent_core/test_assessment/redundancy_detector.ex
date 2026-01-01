@@ -28,7 +28,8 @@ defmodule AgentCore.TestAssessment.RedundancyDetector do
         redundancy_type: :identical_coverage,
         confidence_score: calculate_coverage_confidence(coverage_pattern, tests),
         recommended_action: "Keep '#{recommended_test.name}', consider removing others",
-        justification: "These tests exercise identical code paths: #{Enum.join(coverage_pattern, ", ")}"
+        justification:
+          "These tests exercise identical code paths: #{Enum.join(coverage_pattern, ", ")}"
       }
     end)
   end
@@ -53,7 +54,8 @@ defmodule AgentCore.TestAssessment.RedundancyDetector do
         redundancy_type: :similar_logic,
         confidence_score: calculate_similarity_confidence(assertion_pattern, tests),
         recommended_action: "Keep '#{recommended_test.name}', review others for consolidation",
-        justification: "These tests have similar assertion patterns and may be testing the same logic"
+        justification:
+          "These tests have similar assertion patterns and may be testing the same logic"
       }
     end)
   end
@@ -90,9 +92,12 @@ defmodule AgentCore.TestAssessment.RedundancyDetector do
       %RedundancyFinding{
         test_names: test_names,
         redundancy_type: :duplicate_assertions,
-        confidence_score: 0.8, # Lower confidence for LiveView tests
-        recommended_action: "Keep '#{recommended_test.name}', review others for different interaction patterns",
-        justification: "These LiveView tests have identical interaction patterns: #{interaction_pattern}"
+        # Lower confidence for LiveView tests
+        confidence_score: 0.8,
+        recommended_action:
+          "Keep '#{recommended_test.name}', review others for different interaction patterns",
+        justification:
+          "These LiveView tests have identical interaction patterns: #{interaction_pattern}"
       }
     end)
   end
@@ -198,7 +203,7 @@ defmodule AgentCore.TestAssessment.RedundancyDetector do
     setup_complexity = length(test.setup_blocks)
 
     # Higher score for more comprehensive tests
-    base_score + (assertion_count * 0.1) + (setup_complexity * 0.05)
+    base_score + assertion_count * 0.1 + setup_complexity * 0.05
   end
 
   defp calculate_coverage_confidence(coverage_pattern, tests) do

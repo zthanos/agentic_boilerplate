@@ -10,8 +10,10 @@ defmodule AgentRuntime.Llm.ProviderRouter do
   @spec route(provider()) :: {:ok, module()} | {:error, term()}
   def route(provider) when is_atom(provider) do
     case override_for(provider) do
-      {:ok, mod} when is_atom(mod) -> {:ok, mod}  # Δεν ταιριάζει με :none
-      _ -> default_route(provider)                 # Ταιριάζει με :none
+      # Δεν ταιριάζει με :none
+      {:ok, mod} when is_atom(mod) -> {:ok, mod}
+      # Ταιριάζει με :none
+      _ -> default_route(provider)
     end
   end
 

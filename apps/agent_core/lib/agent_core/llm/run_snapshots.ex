@@ -27,7 +27,6 @@ defmodule AgentCore.Llm.RunSnapshots do
       trace_id: trace_id,
       parent_run_id: Map.get(meta, :parent_run_id),
       phase: Map.get(meta, :phase),
-
       fingerprint: cfg.fingerprint,
       profile_id: cfg.profile_id,
       profile_name: cfg.profile_name,
@@ -55,7 +54,6 @@ defmodule AgentCore.Llm.RunSnapshots do
       resolved_at: cfg.resolved_at
     }
   end
-
 
   # UUIDv4 without Ecto
   defp uuid4 do

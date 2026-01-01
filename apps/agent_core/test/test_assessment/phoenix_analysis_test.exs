@@ -59,7 +59,10 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysisTest do
         line_number: 15,
         test_type: :test,
         setup_blocks: [],
-        assertions: ["validate_required(changeset, [:name])", "validate_length(changeset, :name, min: 2)"],
+        assertions: [
+          "validate_required(changeset, [:name])",
+          "validate_length(changeset, :name, min: 2)"
+        ],
         dependencies: ["Ecto.Changeset"],
         complexity_score: 2.0
       }
@@ -87,7 +90,10 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysisTest do
         line_number: 8,
         test_type: :test,
         setup_blocks: ["use Phoenix.Component"],
-        assertions: ["render_component(&user_card/1, %{user: user})", "has_element?(html, \".user-card\")"],
+        assertions: [
+          "render_component(&user_card/1, %{user: user})",
+          "has_element?(html, \".user-card\")"
+        ],
         dependencies: ["Phoenix.Component"],
         complexity_score: 2.5
       }

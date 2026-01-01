@@ -60,11 +60,12 @@ defmodule AgentCore.TestAssessment.ReportGenerator do
       report.redundancy_findings
       |> Enum.sort_by(& &1.confidence_score, :desc)
 
-    %{report |
-      test_categories: organized_categories,
-      recommendations: sorted_recommendations,
-      coverage_gaps: sorted_coverage_gaps,
-      redundancy_findings: sorted_redundancy_findings
+    %{
+      report
+      | test_categories: organized_categories,
+        recommendations: sorted_recommendations,
+        coverage_gaps: sorted_coverage_gaps,
+        redundancy_findings: sorted_redundancy_findings
     }
   end
 
@@ -250,9 +251,9 @@ defmodule AgentCore.TestAssessment.ReportGenerator do
     categories
     |> Enum.map(fn {type, tests} ->
       "### #{String.capitalize(to_string(type))} Tests (#{map_size(tests)})\n" <>
-      (tests
-       |> Enum.map(fn {test_name, _category} -> "- #{test_name}" end)
-       |> Enum.join("\n"))
+        (tests
+         |> Enum.map(fn {test_name, _category} -> "- #{test_name}" end)
+         |> Enum.join("\n"))
     end)
     |> Enum.join("\n\n")
   end
@@ -277,6 +278,7 @@ defmodule AgentCore.TestAssessment.ReportGenerator do
     |> Enum.with_index(1)
     |> Enum.map(fn {gap, index} ->
       function_info = if gap.function_name, do: ".#{gap.function_name}", else: ""
+
       """
       ### #{index}. #{gap.module_name}#{function_info} [#{String.upcase(to_string(gap.priority))}]
       Type: #{gap.gap_type}
@@ -390,9 +392,10 @@ defmodule AgentCore.TestAssessment.ReportGenerator do
   defp format_categories_html(categories) when is_map(categories) do
     categories
     |> Enum.map(fn {type, tests} ->
-      test_list = tests
-                  |> Enum.map(fn {test_name, _category} -> "<li>#{test_name}</li>" end)
-                  |> Enum.join("")
+      test_list =
+        tests
+        |> Enum.map(fn {test_name, _category} -> "<li>#{test_name}</li>" end)
+        |> Enum.join("")
 
       """
       <h3>#{String.capitalize(to_string(type))} Tests (#{map_size(tests)})</h3>
@@ -543,9 +546,10 @@ defmodule AgentCore.TestAssessment.ReportGenerator do
   defp categories_to_map(categories) when is_map(categories) do
     categories
     |> Map.new(fn {type, tests} ->
-      {type, Map.new(tests, fn {test_name, category} ->
-        {test_name, category_to_map(category)}
-      end)}
+      {type,
+       Map.new(tests, fn {test_name, category} ->
+         {test_name, category_to_map(category)}
+       end)}
     end)
   end
 

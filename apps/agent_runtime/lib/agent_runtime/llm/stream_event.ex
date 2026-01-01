@@ -8,9 +8,9 @@ defmodule AgentRuntime.Llm.StreamEvent do
   @type event_type :: :open | :token | :done | :clarify | :error | :ping
 
   @type t :: %__MODULE__{
-    event: event_type(),
-    data: map()
-  }
+          event: event_type(),
+          data: map()
+        }
 
   defstruct [:event, :data]
 

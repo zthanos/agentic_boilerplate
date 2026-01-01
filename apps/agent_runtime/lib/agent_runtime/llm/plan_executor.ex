@@ -38,7 +38,13 @@ defmodule AgentRuntime.Llm.PlanExecutor do
   Execute a plan (non-streaming). Requires :plan_id in opts.
   Optional: :plan_version (integer or :latest, default :latest).
   """
-  @spec execute_plan(profile :: term(), overrides :: map(), input :: map(), exec_meta :: map(), keyword()) ::
+  @spec execute_plan(
+          profile :: term(),
+          overrides :: map(),
+          input :: map(),
+          exec_meta :: map(),
+          keyword()
+        ) ::
           result()
   def execute_plan(profile, overrides, input, exec_meta, opts \\ []) when is_map(exec_meta) do
     plan_id = Keyword.fetch!(opts, :plan_id)
@@ -148,7 +154,10 @@ defmodule AgentRuntime.Llm.PlanExecutor do
     trace_id = Map.get(ctx.exec_meta, "trace_id")
 
     Logger.info("[PlanExecutor] start trace_id=#{trace_id} steps=#{length(steps)}")
-    Logger.info("[PlanExecutor] plan=#{ctx.exec_meta["plan_id"]}:#{ctx.exec_meta["plan_version"]} trace_id=#{trace_id}")
+
+    Logger.info(
+      "[PlanExecutor] plan=#{ctx.exec_meta["plan_id"]}:#{ctx.exec_meta["plan_version"]} trace_id=#{trace_id}"
+    )
 
     Enum.reduce_while(steps, {:cont, ctx}, fn step_mod, {:cont, ctx_acc} ->
       ensure_step!(step_mod)
@@ -241,7 +250,9 @@ defmodule AgentRuntime.Llm.PlanExecutor do
   defp get_last_run_id(_), do: nil
 
   defp maybe_put_parent_run_id(meta, nil), do: meta
-  defp maybe_put_parent_run_id(meta, parent_run_id), do: Map.put(meta, "parent_run_id", parent_run_id)
+
+  defp maybe_put_parent_run_id(meta, parent_run_id),
+    do: Map.put(meta, "parent_run_id", parent_run_id)
 
   # Effective opts = base step opts (including infra injections) + plan per-step policies
   defp step_opts(step_mod, opts, plan) do

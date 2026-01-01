@@ -29,7 +29,4 @@ defmodule AgentRuntime.Llm.ProfileSelectorTest do
       Application.put_env(:agent_runtime, ProfileSelector, prev)
     end
   end
-
-
-
 end

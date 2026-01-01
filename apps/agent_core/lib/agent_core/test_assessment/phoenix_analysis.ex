@@ -119,11 +119,11 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
   UI interactions, and component interactions.
   """
   @spec analyze_liveview_interactions([ParsedTest.t()]) :: %{
-    tested_interactions: [String.t()],
-    untested_interactions: [String.t()],
-    interaction_coverage: float(),
-    recommendations: [Recommendation.t()]
-  }
+          tested_interactions: [String.t()],
+          untested_interactions: [String.t()],
+          interaction_coverage: float(),
+          recommendations: [Recommendation.t()]
+        }
   def analyze_liveview_interactions(parsed_tests) do
     Logger.info("Analyzing LiveView interaction patterns...")
 
@@ -160,11 +160,11 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
   validation testing coverage.
   """
   @spec detect_form_validation_coverage([ParsedTest.t()]) :: %{
-    tested_validations: [String.t()],
-    untested_validations: [String.t()],
-    validation_coverage: float(),
-    coverage_gaps: [CoverageGap.t()]
-  }
+          tested_validations: [String.t()],
+          untested_validations: [String.t()],
+          validation_coverage: float(),
+          coverage_gaps: [CoverageGap.t()]
+        }
   def detect_form_validation_coverage(parsed_tests) do
     Logger.info("Detecting form validation test coverage...")
 
@@ -201,11 +201,11 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
   lack proper interaction testing.
   """
   @spec identify_untested_component_interactions([ParsedTest.t()]) :: %{
-    tested_components: [String.t()],
-    untested_components: [String.t()],
-    component_coverage: float(),
-    coverage_gaps: [CoverageGap.t()]
-  }
+          tested_components: [String.t()],
+          untested_components: [String.t()],
+          component_coverage: float(),
+          coverage_gaps: [CoverageGap.t()]
+        }
   def identify_untested_component_interactions(parsed_tests) do
     Logger.info("Identifying untested Phoenix component interactions...")
 
@@ -242,11 +242,11 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
   particularly parsers, serializers, and data transformations.
   """
   @spec detect_property_test_opportunities([ParsedTest.t()]) :: %{
-    parser_opportunities: [String.t()],
-    transformation_opportunities: [String.t()],
-    existing_property_tests: [String.t()],
-    recommendations: [Recommendation.t()]
-  }
+          parser_opportunities: [String.t()],
+          transformation_opportunities: [String.t()],
+          existing_property_tests: [String.t()],
+          recommendations: [Recommendation.t()]
+        }
   def detect_property_test_opportunities(parsed_tests) do
     Logger.info("Detecting property-based test opportunities...")
 
@@ -265,10 +265,11 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
     untested_transformations = transformation_opportunities -- tested_functions
 
     # Generate recommendations
-    recommendations = generate_property_test_recommendations(
-      untested_parsers,
-      untested_transformations
-    )
+    recommendations =
+      generate_property_test_recommendations(
+        untested_parsers,
+        untested_transformations
+      )
 
     %{
       parser_opportunities: untested_parsers,
@@ -284,13 +285,13 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
   Combines all Phoenix-specific analysis features into a single report.
   """
   @spec analyze_phoenix_features([ParsedTest.t()]) :: %{
-    liveview_analysis: map(),
-    form_validation_analysis: map(),
-    component_analysis: map(),
-    property_test_analysis: map(),
-    overall_phoenix_coverage: float(),
-    phoenix_recommendations: [Recommendation.t()]
-  }
+          liveview_analysis: map(),
+          form_validation_analysis: map(),
+          component_analysis: map(),
+          property_test_analysis: map(),
+          overall_phoenix_coverage: float(),
+          phoenix_recommendations: [Recommendation.t()]
+        }
   def analyze_phoenix_features(parsed_tests) do
     Logger.info("Performing comprehensive Phoenix-specific analysis...")
 
@@ -301,16 +302,17 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
     property_test_analysis = detect_property_test_opportunities(parsed_tests)
 
     # Calculate overall Phoenix coverage
-    overall_coverage = calculate_overall_phoenix_coverage([
-      liveview_analysis.interaction_coverage,
-      form_validation_analysis.validation_coverage,
-      component_analysis.component_coverage
-    ])
+    overall_coverage =
+      calculate_overall_phoenix_coverage([
+        liveview_analysis.interaction_coverage,
+        form_validation_analysis.validation_coverage,
+        component_analysis.component_coverage
+      ])
 
     # Combine all recommendations
     all_recommendations =
       liveview_analysis.recommendations ++
-      property_test_analysis.recommendations
+        property_test_analysis.recommendations
 
     %{
       liveview_analysis: liveview_analysis,
@@ -383,11 +385,13 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
       test_content = build_test_content(test)
 
       # Look for handle_event definitions and phx- attributes in test content
-      event_handlers = Regex.scan(~r/handle_event\s*\(\s*"([^"]+)"/, test_content, capture: :all_but_first)
-                      |> List.flatten()
+      event_handlers =
+        Regex.scan(~r/handle_event\s*\(\s*"([^"]+)"/, test_content, capture: :all_but_first)
+        |> List.flatten()
 
-      phx_events = Regex.scan(~r/phx-[a-z]+\s*=\s*"([^"]+)"/, test_content, capture: :all_but_first)
-                   |> List.flatten()
+      phx_events =
+        Regex.scan(~r/phx-[a-z]+\s*=\s*"([^"]+)"/, test_content, capture: :all_but_first)
+        |> List.flatten()
 
       event_handlers ++ phx_events
     end)
@@ -407,7 +411,7 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
         end
       end)
     end)
-    |> Enum.filter(& &1 != nil)
+    |> Enum.filter(&(&1 != nil))
     |> Enum.uniq()
   end
 
@@ -430,11 +434,13 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
       test_content = build_test_content(test)
 
       # Extract component names from test content
-      component_calls = Regex.scan(~r/<\.([a-z_]+)[^>]*>/, test_content, capture: :all_but_first)
-                       |> List.flatten()
+      component_calls =
+        Regex.scan(~r/<\.([a-z_]+)[^>]*>/, test_content, capture: :all_but_first)
+        |> List.flatten()
 
-      slot_calls = Regex.scan(~r/<:([a-z_]+)[^>]*>/, test_content, capture: :all_but_first)
-                   |> List.flatten()
+      slot_calls =
+        Regex.scan(~r/<:([a-z_]+)[^>]*>/, test_content, capture: :all_but_first)
+        |> List.flatten()
 
       component_calls ++ slot_calls
     end)
@@ -447,11 +453,13 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
       test_content = build_test_content(test)
 
       # Look for component definitions and usage patterns
-      component_defs = Regex.scan(~r/def\s+([a-z_]+)\s*\(\s*assigns\s*\)/, test_content, capture: :all_but_first)
-                      |> List.flatten()
+      component_defs =
+        Regex.scan(~r/def\s+([a-z_]+)\s*\(\s*assigns\s*\)/, test_content, capture: :all_but_first)
+        |> List.flatten()
 
-      component_usage = Regex.scan(~r/<\.([a-z_]+)/, test_content, capture: :all_but_first)
-                       |> List.flatten()
+      component_usage =
+        Regex.scan(~r/<\.([a-z_]+)/, test_content, capture: :all_but_first)
+        |> List.flatten()
 
       component_defs ++ component_usage
     end)
@@ -462,9 +470,10 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
     parsed_tests
     |> Enum.filter(fn test ->
       test_content = build_test_content(test)
+
       String.contains?(test_content, "property") or
-      String.contains?(test_content, "StreamData") or
-      String.contains?(test_content, "check all")
+        String.contains?(test_content, "StreamData") or
+        String.contains?(test_content, "check all")
     end)
     |> Enum.map(& &1.name)
   end
@@ -475,7 +484,8 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
       test_content = build_test_content(test)
 
       @parser_transformation_patterns
-      |> Enum.take(8)  # Take only parser patterns
+      # Take only parser patterns
+      |> Enum.take(8)
       |> Enum.flat_map(fn pattern ->
         Regex.scan(pattern, test_content, capture: :all_but_first)
         |> List.flatten()
@@ -490,7 +500,8 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
       test_content = build_test_content(test)
 
       @parser_transformation_patterns
-      |> Enum.drop(8)  # Take only transformation patterns
+      # Take only transformation patterns
+      |> Enum.drop(8)
       |> Enum.flat_map(fn pattern ->
         Regex.scan(pattern, test_content, capture: :all_but_first)
         |> List.flatten()
@@ -515,31 +526,42 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
     recommendations = []
 
     # Add recommendations for low coverage
-    recommendations = if coverage < 70.0 do
-      [%Recommendation{
-        type: :add_test,
-        priority: :high,
-        title: "Improve LiveView interaction test coverage",
-        description: "LiveView interaction coverage is #{Float.round(coverage, 1)}%. Consider adding tests for untested interactions.",
-        affected_files: [],
-        estimated_effort: :medium,
-        justification: "Low LiveView interaction coverage indicates potential gaps in user interaction testing."
-      } | recommendations]
-    else
-      recommendations
-    end
+    recommendations =
+      if coverage < 70.0 do
+        [
+          %Recommendation{
+            type: :add_test,
+            priority: :high,
+            title: "Improve LiveView interaction test coverage",
+            description:
+              "LiveView interaction coverage is #{Float.round(coverage, 1)}%. Consider adding tests for untested interactions.",
+            affected_files: [],
+            estimated_effort: :medium,
+            justification:
+              "Low LiveView interaction coverage indicates potential gaps in user interaction testing."
+          }
+          | recommendations
+        ]
+      else
+        recommendations
+      end
 
     # Add specific recommendations for untested interactions
     if length(untested_interactions) > 0 do
-      [%Recommendation{
-        type: :add_test,
-        priority: :medium,
-        title: "Add tests for untested LiveView interactions",
-        description: "Found #{length(untested_interactions)} untested LiveView interactions that should be covered.",
-        affected_files: [],
-        estimated_effort: :medium,
-        justification: "Untested LiveView interactions may lead to undetected bugs in user interface behavior."
-      } | recommendations]
+      [
+        %Recommendation{
+          type: :add_test,
+          priority: :medium,
+          title: "Add tests for untested LiveView interactions",
+          description:
+            "Found #{length(untested_interactions)} untested LiveView interactions that should be covered.",
+          affected_files: [],
+          estimated_effort: :medium,
+          justification:
+            "Untested LiveView interactions may lead to undetected bugs in user interface behavior."
+        }
+        | recommendations
+      ]
     else
       recommendations
     end
@@ -577,31 +599,42 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
     recommendations = []
 
     # Add parser recommendations
-    recommendations = if length(untested_parsers) > 0 do
-      [%Recommendation{
-        type: :add_test,
-        priority: :high,
-        title: "Add property tests for parsers",
-        description: "Found #{length(untested_parsers)} parser functions that would benefit from property-based testing.",
-        affected_files: [],
-        estimated_effort: :medium,
-        justification: "Parser functions are prone to edge case bugs that property-based testing can effectively catch."
-      } | recommendations]
-    else
-      recommendations
-    end
+    recommendations =
+      if length(untested_parsers) > 0 do
+        [
+          %Recommendation{
+            type: :add_test,
+            priority: :high,
+            title: "Add property tests for parsers",
+            description:
+              "Found #{length(untested_parsers)} parser functions that would benefit from property-based testing.",
+            affected_files: [],
+            estimated_effort: :medium,
+            justification:
+              "Parser functions are prone to edge case bugs that property-based testing can effectively catch."
+          }
+          | recommendations
+        ]
+      else
+        recommendations
+      end
 
     # Add transformation recommendations
     if length(untested_transformations) > 0 do
-      [%Recommendation{
-        type: :add_test,
-        priority: :medium,
-        title: "Add property tests for transformations",
-        description: "Found #{length(untested_transformations)} transformation functions that would benefit from property-based testing.",
-        affected_files: [],
-        estimated_effort: :medium,
-        justification: "Data transformation functions benefit from property-based testing to ensure correctness across input ranges."
-      } | recommendations]
+      [
+        %Recommendation{
+          type: :add_test,
+          priority: :medium,
+          title: "Add property tests for transformations",
+          description:
+            "Found #{length(untested_transformations)} transformation functions that would benefit from property-based testing.",
+          affected_files: [],
+          estimated_effort: :medium,
+          justification:
+            "Data transformation functions benefit from property-based testing to ensure correctness across input ranges."
+        }
+        | recommendations
+      ]
     else
       recommendations
     end
@@ -624,7 +657,9 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
           String.contains?(full_match, "validate_change") -> "validate_change"
           true -> nil
         end
-      _ -> nil
+
+      _ ->
+        nil
     end
   end
 

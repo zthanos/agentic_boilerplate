@@ -37,7 +37,10 @@ defmodule AgentRuntime.Flows.Requirements.Schema do
             "properties" => %{
               "id" => %{"type" => "string", "pattern" => "^[a-z0-9_\\-]+$"},
               "name" => %{"type" => "string", "minLength" => 1},
-              "type" => %{"type" => "string", "enum" => ["user", "admin", "system", "external_party"]},
+              "type" => %{
+                "type" => "string",
+                "enum" => ["user", "admin", "system", "external_party"]
+              },
               "description" => %{"type" => "string"}
             }
           }
@@ -65,7 +68,10 @@ defmodule AgentRuntime.Flows.Requirements.Schema do
           "items" => nfr_item_schema()
         },
         "assumptions" => %{"type" => "array", "items" => %{"type" => "string", "minLength" => 1}},
-        "open_questions" => %{"type" => "array", "items" => %{"type" => "string", "minLength" => 1}}
+        "open_questions" => %{
+          "type" => "array",
+          "items" => %{"type" => "string", "minLength" => 1}
+        }
       }
     }
   end
@@ -81,9 +87,18 @@ defmodule AgentRuntime.Flows.Requirements.Schema do
         "description" => %{"type" => "string", "minLength" => 1},
         "priority" => %{"type" => "string", "enum" => ["must", "should", "could", "wont"]},
         "status" => %{"type" => "string", "enum" => ["proposed", "confirmed"]},
-        "actors" => %{"type" => "array", "items" => %{"type" => "string", "pattern" => "^[a-z0-9_\\-]+$"}},
-        "systems" => %{"type" => "array", "items" => %{"type" => "string", "pattern" => "^[a-z0-9_\\-]+$"}},
-        "acceptance_criteria" => %{"type" => "array", "items" => %{"type" => "string", "minLength" => 1}},
+        "actors" => %{
+          "type" => "array",
+          "items" => %{"type" => "string", "pattern" => "^[a-z0-9_\\-]+$"}
+        },
+        "systems" => %{
+          "type" => "array",
+          "items" => %{"type" => "string", "pattern" => "^[a-z0-9_\\-]+$"}
+        },
+        "acceptance_criteria" => %{
+          "type" => "array",
+          "items" => %{"type" => "string", "minLength" => 1}
+        },
         "references" => %{"type" => "array", "items" => %{"type" => "string", "minLength" => 1}}
       }
     }

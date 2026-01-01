@@ -1,8 +1,6 @@
 defmodule AgentRuntime.Llm.RunStore do
   @moduledoc false
 
-
-
   @spec impl() :: module()
   def impl do
     Application.get_env(:agent_runtime, __MODULE__, [])

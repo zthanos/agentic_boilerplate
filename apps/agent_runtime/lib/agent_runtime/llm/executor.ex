@@ -268,7 +268,6 @@ defmodule AgentRuntime.Llm.Executor do
     end
   end
 
-
   defp finalize_embedding_return(input, vectors) when is_binary(input) do
     case vectors do
       [v | _] -> v

@@ -5,21 +5,37 @@ defmodule AgentWebWeb.RunController do
   alias AgentRuntime.Llm.Runs
   alias AgentWeb.OpenApi.Schemas
 
-  operation :index,
+  operation(:index,
     summary: "List runs",
     parameters: [
-      limit: [in: :query, description: "Max items (1-200), default 50", type: :integer, required: false],
+      limit: [
+        in: :query,
+        description: "Max items (1-200), default 50",
+        type: :integer,
+        required: false
+      ],
       trace_id: [in: :query, description: "Filter by trace_id", type: :string, required: false],
-      fingerprint: [in: :query, description: "Filter by fingerprint", type: :string, required: false],
-      profile_id: [in: :query, description: "Filter by profile_id", type: :string, required: false],
+      fingerprint: [
+        in: :query,
+        description: "Filter by fingerprint",
+        type: :string,
+        required: false
+      ],
+      profile_id: [
+        in: :query,
+        description: "Filter by profile_id",
+        type: :string,
+        required: false
+      ],
       status: [in: :query, description: "Filter by status", type: :string, required: false]
     ],
     responses: [
       ok: {"OK", "application/json", Schemas.RunsIndexResponse},
       internal_server_error: {"Internal Server Error", "application/json", Schemas.ApiError}
     ]
+  )
 
-  operation :show,
+  operation(:show,
     summary: "Get run by run_id",
     parameters: [
       run_id: [in: :path, description: "Run ID", type: :string, required: true]
@@ -29,6 +45,7 @@ defmodule AgentWebWeb.RunController do
       not_found: {"Not Found", "application/json", Schemas.ApiError},
       internal_server_error: {"Internal Server Error", "application/json", Schemas.ApiError}
     ]
+  )
 
   # GET /api/runs?limit=50&trace_id=...&fingerprint=...&profile_id=...&status=...
   def index(conn, params) do
@@ -54,7 +71,10 @@ defmodule AgentWebWeb.RunController do
       {:error, reason} ->
         conn
         |> put_status(:internal_server_error)
-        |> json(%{status: "error", error: %{message: "runs_list_failed", reason: inspect(reason)}})
+        |> json(%{
+          status: "error",
+          error: %{message: "runs_list_failed", reason: inspect(reason)}
+        })
     end
   end
 

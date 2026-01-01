@@ -4,12 +4,12 @@ defmodule AgentCore.TestAssessment.TestFile do
   """
 
   @type t :: %__MODULE__{
-    path: String.t(),
-    app_name: String.t(),
-    relative_path: String.t(),
-    size: integer(),
-    last_modified: DateTime.t()
-  }
+          path: String.t(),
+          app_name: String.t(),
+          relative_path: String.t(),
+          size: integer(),
+          last_modified: DateTime.t()
+        }
 
   defstruct [
     :path,

@@ -69,11 +69,15 @@ defmodule AgentRuntime.Llm.HttpClient.FinchClient do
 
     try do
       acc =
-        Finch.stream(req, AgentRuntimeFinch, acc0, fun,
-          receive_timeout: timeout_ms
-        )
+        Finch.stream(req, AgentRuntimeFinch, acc0, fun, receive_timeout: timeout_ms)
 
-      {:ok, %{full_text: acc.full, usage: acc.usage, raw_last: acc.raw_last, finish_reason: acc.finish_reason}}
+      {:ok,
+       %{
+         full_text: acc.full,
+         usage: acc.usage,
+         raw_last: acc.raw_last,
+         finish_reason: acc.finish_reason
+       }}
     catch
       {:http_error, status} ->
         {:error, {:http_error, status}}
@@ -160,13 +164,15 @@ defmodule AgentRuntime.Llm.HttpClient.FinchClient do
       |> Map.get("content", "")
 
     finish_reason = Map.get(c, "finish_reason")
-    usage = Map.get(raw, "usage") # often nil during stream; may appear at end depending on server
+    # often nil during stream; may appear at end depending on server
+    usage = Map.get(raw, "usage")
     {to_string(token || ""), finish_reason, usage}
   end
 
   defp extract_stream_fields(_raw), do: {"", nil, nil}
 
   defp maybe_emit_token(acc, "", _on_chunk), do: acc
+
   defp maybe_emit_token(acc, token, on_chunk) do
     _ = on_chunk.(token)
     %{acc | full: acc.full <> token}
@@ -178,11 +184,9 @@ defmodule AgentRuntime.Llm.HttpClient.FinchClient do
   defp update_usage(acc, nil), do: acc
   defp update_usage(acc, usage), do: %{acc | usage: usage}
 
-
   defp maybe_auth(headers, nil), do: headers
   defp maybe_auth(headers, ""), do: headers
 
   defp maybe_auth(headers, api_key),
     do: [{~c"authorization", to_charlist("Bearer " <> api_key)} | headers]
-
 end

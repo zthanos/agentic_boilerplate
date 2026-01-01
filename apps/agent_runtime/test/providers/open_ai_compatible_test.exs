@@ -13,7 +13,6 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatibleTest do
 
       {:ok, {{~c"HTTP/1.1", 200, ~c"OK"}, [], resp_body}}
     end
-
   end
 
   setup do
@@ -35,6 +34,7 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatibleTest do
       invocation: %{model: :local, generation: %{}},
       input: %{type: :chat, messages: [%{role: :user, content: "hi"}]}
     }
+
     assert {:ok, _} = AgentRuntime.Llm.Providers.OpenAICompatible.call(req)
 
     assert_received {:post, url, headers, _body, _http_opts}

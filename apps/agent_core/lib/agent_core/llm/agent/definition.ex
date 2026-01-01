@@ -131,7 +131,9 @@ defmodule AgentCore.Llm.Agent.Definition do
   end
 
   defp require_int(errors, field, value) do
-    if is_integer(value) and value >= 0, do: errors, else: [{field, :not_a_nonneg_integer} | errors]
+    if is_integer(value) and value >= 0,
+      do: errors,
+      else: [{field, :not_a_nonneg_integer} | errors]
   end
 
   defp validate_map(errors, field, value) do

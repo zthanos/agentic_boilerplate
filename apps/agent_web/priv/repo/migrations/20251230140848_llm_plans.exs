@@ -22,7 +22,6 @@ defmodule AgentWeb.Repo.Migrations.LlmPlans do
       timestamps(type: :utc_datetime_usec)
     end
 
-
     # Unique index on (plan_id, version) – guarantees a single row per plan/version.
     create unique_index(:llm_plans, [:plan_id, :version])
 
@@ -30,8 +29,9 @@ defmodule AgentWeb.Repo.Migrations.LlmPlans do
     # 2️⃣ Add the plan references to llm_runs
     # ------------------------------------------------------------------
     alter table(:llm_runs) do
-      add :plan_id,       :string   # nullable – not all runs need a plan reference
-      add :plan_version,  :integer
+      # nullable – not all runs need a plan reference
+      add :plan_id, :string
+      add :plan_version, :integer
     end
 
     # Index for fast look‑ups of runs by the (plan_id, plan_version) pair.

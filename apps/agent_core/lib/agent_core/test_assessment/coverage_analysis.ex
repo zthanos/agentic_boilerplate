@@ -112,11 +112,14 @@ defmodule AgentCore.TestAssessment.CoverageAnalysis do
   defp calculate_total_lines(parsed_tests) do
     # Estimate total lines based on complexity scores and test count
     # This is a heuristic since we don't have actual source code analysis
-    base_lines = length(parsed_tests) * 50  # Average lines per test file
-    complexity_bonus = parsed_tests
-                      |> Enum.map(& &1.complexity_score)
-                      |> Enum.sum()
-                      |> round()
+    # Average lines per test file
+    base_lines = length(parsed_tests) * 50
+
+    complexity_bonus =
+      parsed_tests
+      |> Enum.map(& &1.complexity_score)
+      |> Enum.sum()
+      |> round()
 
     base_lines + complexity_bonus
   end
@@ -151,31 +154,36 @@ defmodule AgentCore.TestAssessment.CoverageAnalysis do
         test_paths
         |> Enum.map(fn path ->
           coverage_count = Map.get(path_coverage_counts, path, 1)
-          1.0 / coverage_count  # More unique = higher score
+          # More unique = higher score
+          1.0 / coverage_count
         end)
         |> Enum.sum()
 
-      unique_score / length(test_paths)  # Average uniqueness
+      # Average uniqueness
+      unique_score / length(test_paths)
     end
   end
 
   defp calculate_quality_multiplier(test) do
     # Base quality from complexity
-    complexity_factor = min(test.complexity_score / 10.0, 2.0)  # Cap at 2x
+    # Cap at 2x
+    complexity_factor = min(test.complexity_score / 10.0, 2.0)
 
     # Assertion quality (more assertions = better coverage)
-    assertion_factor = min(length(test.assertions) / 5.0, 1.5)  # Cap at 1.5x
+    # Cap at 1.5x
+    assertion_factor = min(length(test.assertions) / 5.0, 1.5)
 
     # Setup quality (proper setup indicates thorough testing)
     setup_factor = if length(test.setup_blocks) > 0, do: 1.2, else: 1.0
 
     # Test type factor (integration tests generally more valuable)
-    type_factor = case test.test_type do
-      :integration -> 1.3
-      :property_based -> 1.4
-      :end_to_end -> 1.5
-      _ -> 1.0
-    end
+    type_factor =
+      case test.test_type do
+        :integration -> 1.3
+        :property_based -> 1.4
+        :end_to_end -> 1.5
+        _ -> 1.0
+      end
 
     complexity_factor * assertion_factor * setup_factor * type_factor
   end
@@ -211,7 +219,8 @@ defmodule AgentCore.TestAssessment.CoverageAnalysis do
         function_name: function_name,
         gap_type: :missing_edge_case,
         priority: :medium,
-        description: "Function #{path} may need edge case testing (empty inputs, boundary values)",
+        description:
+          "Function #{path} may need edge case testing (empty inputs, boundary values)",
         suggested_test_type: "property-based test"
       }
     end)
@@ -232,7 +241,8 @@ defmodule AgentCore.TestAssessment.CoverageAnalysis do
         function_name: function_name,
         gap_type: :missing_error_condition,
         priority: :high,
-        description: "Function #{path} may need error condition testing (invalid inputs, failure scenarios)",
+        description:
+          "Function #{path} may need error condition testing (invalid inputs, failure scenarios)",
         suggested_test_type: "unit test with error cases"
       }
     end)
@@ -284,9 +294,9 @@ defmodule AgentCore.TestAssessment.CoverageAnalysis do
   defp valid_code_path?(path) do
     # Basic validation for code paths
     String.length(path) > 3 and
-    String.contains?(path, ".") and
-    not String.starts_with?(path, ".") and
-    not String.ends_with?(path, ".")
+      String.contains?(path, ".") and
+      not String.starts_with?(path, ".") and
+      not String.ends_with?(path, ".")
   end
 
   defp extract_function_references(text) do
@@ -317,20 +327,20 @@ defmodule AgentCore.TestAssessment.CoverageAnalysis do
   defp likely_needs_edge_case_testing?(path) do
     # Functions that commonly need edge case testing
     String.contains?(path, "parse") or
-    String.contains?(path, "validate") or
-    String.contains?(path, "transform") or
-    String.contains?(path, "convert") or
-    String.contains?(path, "calculate")
+      String.contains?(path, "validate") or
+      String.contains?(path, "transform") or
+      String.contains?(path, "convert") or
+      String.contains?(path, "calculate")
   end
 
   defp likely_needs_error_testing?(path) do
     # Functions that commonly need error condition testing
     String.contains?(path, "create") or
-    String.contains?(path, "update") or
-    String.contains?(path, "delete") or
-    String.contains?(path, "fetch") or
-    String.contains?(path, "get") or
-    String.contains?(path, "parse") or
-    String.contains?(path, "validate")
+      String.contains?(path, "update") or
+      String.contains?(path, "delete") or
+      String.contains?(path, "fetch") or
+      String.contains?(path, "get") or
+      String.contains?(path, "parse") or
+      String.contains?(path, "validate")
   end
 end

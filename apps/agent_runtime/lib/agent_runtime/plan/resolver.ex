@@ -25,7 +25,11 @@ defmodule AgentRuntime.Llm.Plan.Resolver do
       end)
 
     if errors == [] do
-      {:ok, Enum.map(plan.steps, fn ref -> {:ok, mod} = resolve_step(ref); mod end)}
+      {:ok,
+       Enum.map(plan.steps, fn ref ->
+         {:ok, mod} = resolve_step(ref)
+         mod
+       end)}
     else
       {:error, Enum.reverse(errors)}
     end

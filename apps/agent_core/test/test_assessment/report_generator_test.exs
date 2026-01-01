@@ -60,7 +60,8 @@ defmodule AgentCore.TestAssessment.ReportGeneratorTest do
             description: "Critical functionality lacks test coverage",
             affected_files: ["lib/user_service.ex"],
             estimated_effort: :medium,
-            justification: "User deletion is a critical operation that should be thoroughly tested"
+            justification:
+              "User deletion is a critical operation that should be thoroughly tested"
           }
         ],
         parsed_tests: [%{name: "test_user_creation"}, %{name: "test_create_user"}],
@@ -111,16 +112,20 @@ defmodule AgentCore.TestAssessment.ReportGeneratorTest do
     test "calculates overall score based on issues found" do
       # Test with many issues - should have lower score
       analysis_results_with_issues = %{
-        redundancy_findings: [%RedundancyFinding{}, %RedundancyFinding{}], # 2 * 2.0 = 4.0 penalty
-        coverage_gaps: [%CoverageGap{}, %CoverageGap{}, %CoverageGap{}], # 3 * 1.5 = 4.5 penalty
-        config_issues: [%ConfigIssue{}], # 1 * 3.0 = 3.0 penalty
+        # 2 * 2.0 = 4.0 penalty
+        redundancy_findings: [%RedundancyFinding{}, %RedundancyFinding{}],
+        # 3 * 1.5 = 4.5 penalty
+        coverage_gaps: [%CoverageGap{}, %CoverageGap{}, %CoverageGap{}],
+        # 1 * 3.0 = 3.0 penalty
+        config_issues: [%ConfigIssue{}],
         parsed_tests: [],
         test_files: [],
         apps_analyzed: 1
       }
 
       report_with_issues = ReportGenerator.generate_report(analysis_results_with_issues)
-      expected_score = 100.0 - 4.0 - 4.5 - 3.0 # = 88.5
+      # = 88.5
+      expected_score = 100.0 - 4.0 - 4.5 - 3.0
       assert report_with_issues.summary.overall_score == expected_score
 
       # Test with no issues - should have perfect score
@@ -143,9 +148,24 @@ defmodule AgentCore.TestAssessment.ReportGeneratorTest do
       report = %AssessmentReport{
         summary: %ReportSummary{},
         test_categories: %{
-          "test_unit_1" => %TestCategory{primary_type: :unit, secondary_types: [], confidence_scores: %{}, focus_areas: []},
-          "test_unit_2" => %TestCategory{primary_type: :unit, secondary_types: [], confidence_scores: %{}, focus_areas: []},
-          "test_integration_1" => %TestCategory{primary_type: :integration, secondary_types: [], confidence_scores: %{}, focus_areas: []}
+          "test_unit_1" => %TestCategory{
+            primary_type: :unit,
+            secondary_types: [],
+            confidence_scores: %{},
+            focus_areas: []
+          },
+          "test_unit_2" => %TestCategory{
+            primary_type: :unit,
+            secondary_types: [],
+            confidence_scores: %{},
+            focus_areas: []
+          },
+          "test_integration_1" => %TestCategory{
+            primary_type: :integration,
+            secondary_types: [],
+            confidence_scores: %{},
+            focus_areas: []
+          }
         },
         redundancy_findings: [
           %RedundancyFinding{confidence_score: 0.7},

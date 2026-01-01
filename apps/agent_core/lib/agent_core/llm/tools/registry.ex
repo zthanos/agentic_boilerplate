@@ -198,7 +198,7 @@ defmodule AgentCore.Llm.Tools.Registry do
 
           true ->
             # Strict: must be known and allowed
-            (not known?(id)) or (not MapSet.member?(allowed_ids, id))
+            not known?(id) or not MapSet.member?(allowed_ids, id)
         end
       end)
 
@@ -229,6 +229,7 @@ defmodule AgentCore.Llm.Tools.Registry do
 
   defp apply_ordering(specs, :sorted_ids), do: Enum.sort_by(specs, & &1.id)
   defp apply_ordering(specs, :stable), do: specs
-  defp apply_ordering(_specs, other), do: raise(ArgumentError, "Invalid ordering: #{inspect(other)}")
 
+  defp apply_ordering(_specs, other),
+    do: raise(ArgumentError, "Invalid ordering: #{inspect(other)}")
 end

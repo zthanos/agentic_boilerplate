@@ -9,14 +9,14 @@ defmodule AgentRuntime.Application do
   def start(_type, _args) do
     children = [
       {Finch,
-      name: AgentRuntimeFinch,
-      pools: %{
-        # LM Studio / local OpenAI-compatible
-        "http://localhost:1234" => [
-          size: 10,
-          count: 1
-        ]
-      }}
+       name: AgentRuntimeFinch,
+       pools: %{
+         # LM Studio / local OpenAI-compatible
+         "http://localhost:1234" => [
+           size: 10,
+           count: 1
+         ]
+       }}
       # Starts a worker by calling: AgentRuntime.Worker.start_link(arg)
       # {AgentRuntime.Worker, arg}
     ]

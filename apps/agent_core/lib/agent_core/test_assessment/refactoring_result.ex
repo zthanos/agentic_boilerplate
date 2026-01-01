@@ -4,12 +4,12 @@ defmodule AgentCore.TestAssessment.RefactoringResult do
   """
 
   @type t :: %__MODULE__{
-    file_path: String.t(),
-    original_content: String.t(),
-    refactored_content: String.t(),
-    changes_applied: [String.t()],
-    warnings: [String.t()]
-  }
+          file_path: String.t(),
+          original_content: String.t(),
+          refactored_content: String.t(),
+          changes_applied: [String.t()],
+          warnings: [String.t()]
+        }
 
   defstruct [
     :file_path,

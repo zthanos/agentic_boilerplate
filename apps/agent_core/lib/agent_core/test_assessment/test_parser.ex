@@ -7,7 +7,14 @@ defmodule AgentCore.TestAssessment.TestParser do
   alias AgentCore.TestAssessment.ParsedTest
 
   @test_macros [:test, :describe, :setup, :setup_all]
-  @assertion_functions [:assert, :assert_receive, :assert_received, :refute, :refute_receive, :refute_received]
+  @assertion_functions [
+    :assert,
+    :assert_receive,
+    :assert_received,
+    :refute,
+    :refute_receive,
+    :refute_received
+  ]
 
   @doc """
   Parses a test file and extracts all test metadata.
@@ -20,7 +27,9 @@ defmodule AgentCore.TestAssessment.TestParser do
     case File.read(file_path) do
       {:ok, content} ->
         case parse_content(content, file_path) do
-          {:ok, parsed_tests} -> {:ok, parsed_tests}
+          {:ok, parsed_tests} ->
+            {:ok, parsed_tests}
+
           {:error, reason} ->
             Logger.warning("Failed to parse #{file_path}: #{inspect(reason)}")
             # Fallback strategy: try pattern matching approach
@@ -129,10 +138,11 @@ defmodule AgentCore.TestAssessment.TestParser do
     conditional_count = count_conditionals(ast)
 
     # Calculate complexity based on various factors
-    complexity = base_score +
-                 (assertion_count * 0.5) +
-                 (nesting_depth * 1.0) +
-                 (conditional_count * 0.8)
+    complexity =
+      base_score +
+        assertion_count * 0.5 +
+        nesting_depth * 1.0 +
+        conditional_count * 0.8
 
     Float.round(complexity, 2)
   end
@@ -312,12 +322,16 @@ defmodule AgentCore.TestAssessment.TestParser do
       case node do
         {:if, _meta, _args} ->
           {node, acc + 1}
+
         {:unless, _meta, _args} ->
           {node, acc + 1}
+
         {:case, _meta, _args} ->
           {node, acc + 1}
+
         {:cond, _meta, _args} ->
           {node, acc + 1}
+
         {:with, _meta, _args} ->
           {node, acc + 1}
 
@@ -351,6 +365,7 @@ defmodule AgentCore.TestAssessment.TestParser do
       cond do
         String.match?(line, ~r/^\s*test\s+"([^"]+)"/) ->
           test_name = extract_test_name_from_line(line)
+
           parsed_test = %ParsedTest{
             name: test_name,
             file_path: file_path,
@@ -361,10 +376,12 @@ defmodule AgentCore.TestAssessment.TestParser do
             dependencies: [],
             complexity_score: 1.0
           }
+
           [parsed_test | acc]
 
         String.match?(line, ~r/^\s*describe\s+"([^"]+)"/) ->
           describe_name = extract_test_name_from_line(line)
+
           parsed_test = %ParsedTest{
             name: describe_name,
             file_path: file_path,
@@ -375,10 +392,12 @@ defmodule AgentCore.TestAssessment.TestParser do
             dependencies: [],
             complexity_score: 1.0
           }
+
           [parsed_test | acc]
 
         String.match?(line, ~r/^\s*setup(_all)?\s+do/) ->
           setup_type = if String.contains?(line, "setup_all"), do: :setup_all, else: :setup
+
           parsed_test = %ParsedTest{
             name: Atom.to_string(setup_type),
             file_path: file_path,
@@ -389,6 +408,7 @@ defmodule AgentCore.TestAssessment.TestParser do
             dependencies: [],
             complexity_score: 1.0
           }
+
           [parsed_test | acc]
 
         true ->

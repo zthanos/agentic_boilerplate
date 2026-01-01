@@ -60,7 +60,8 @@ defmodule AgentWeb.Llm.AgentStoreEcto do
   def put(%Definition{} = agent) do
     with {:ok, agent} <- Definition.validate(agent) do
       attrs = %{
-        agent_id: agent.id,           # This is the agent_id from your Definition
+        # This is the agent_id from your Definition
+        agent_id: agent.id,
         version: agent.version,
         status: "active",
         checksum: agent.checksum,
@@ -80,7 +81,9 @@ defmodule AgentWeb.Llm.AgentStoreEcto do
   defp filters(nil, nil), do: true
   defp filters(agent_id, nil), do: dynamic([a], a.agent_id == ^agent_id)
   defp filters(nil, status), do: dynamic([a], a.status == ^status)
-  defp filters(agent_id, status), do: dynamic([a], a.agent_id == ^agent_id and a.status == ^status)
+
+  defp filters(agent_id, status),
+    do: dynamic([a], a.agent_id == ^agent_id and a.status == ^status)
 
   defp to_definition(%AgentRecord{definition: defmap}) when is_map(defmap) do
     case Definition.from_map(defmap) do

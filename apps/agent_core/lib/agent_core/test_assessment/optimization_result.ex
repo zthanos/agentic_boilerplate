@@ -6,13 +6,13 @@ defmodule AgentCore.TestAssessment.OptimizationResult do
   alias AgentCore.TestAssessment.TestRunResult
 
   @type t :: %__MODULE__{
-    removed_files: [String.t()],
-    modified_files: [String.t()],
-    reorganized_files: %{String.t() => String.t()},
-    backup_directory: String.t(),
-    test_run_result: TestRunResult.t(),
-    optimization_summary: String.t()
-  }
+          removed_files: [String.t()],
+          modified_files: [String.t()],
+          reorganized_files: %{String.t() => String.t()},
+          backup_directory: String.t(),
+          test_run_result: TestRunResult.t(),
+          optimization_summary: String.t()
+        }
 
   defstruct [
     :removed_files,

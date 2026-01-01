@@ -81,7 +81,6 @@ defmodule AgentCore.Llm.Resolver do
           nil -> nil
           v -> to_string(v)
         end,
-
       trace_id: trace_id
     }
   end
@@ -156,14 +155,13 @@ defmodule AgentCore.Llm.Resolver do
 
   defp merge_value(_key, _left, right, _policy), do: right
 
-
-
   defp assumed_list(nil), do: []
   defp assumed_list(v) when is_list(v), do: v
   defp assumed_list(v), do: raise(ArgumentError, "Expected list, got: #{inspect(v)}")
 
   defp merge_list_by_policy(:replace, _left, right), do: right
   defp merge_list_by_policy(:append, left, right), do: left ++ right
+
   defp merge_list_by_policy(:union, left, right) do
     (left ++ right) |> Enum.uniq()
   end
@@ -329,8 +327,6 @@ defmodule AgentCore.Llm.Resolver do
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Map.new()
   end
-
-
 
   # -------------------------
   # Normalizers

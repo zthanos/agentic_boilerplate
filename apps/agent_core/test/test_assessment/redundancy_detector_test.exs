@@ -1,7 +1,12 @@
 defmodule AgentCore.TestAssessment.RedundancyDetectorTest do
   use ExUnit.Case, async: true
 
-  alias AgentCore.TestAssessment.{RedundancyDetector, ParsedTest, RedundancyFinding, CoverageReport}
+  alias AgentCore.TestAssessment.{
+    RedundancyDetector,
+    ParsedTest,
+    RedundancyFinding,
+    CoverageReport
+  }
 
   describe "detect_redundant_coverage/2" do
     test "identifies tests with identical coverage patterns" do
@@ -224,7 +229,10 @@ defmodule AgentCore.TestAssessment.RedundancyDetectorTest do
           line_number: 10,
           test_type: :test,
           setup_blocks: [],
-          assertions: ["render_click(view, \"create-user\")", "assert has_element(view, \"#user-form\")"],
+          assertions: [
+            "render_click(view, \"create-user\")",
+            "assert has_element(view, \"#user-form\")"
+          ],
           dependencies: ["Phoenix.LiveViewTest"],
           complexity_score: 2.0
         },
@@ -234,7 +242,10 @@ defmodule AgentCore.TestAssessment.RedundancyDetectorTest do
           line_number: 20,
           test_type: :test,
           setup_blocks: [],
-          assertions: ["render_click(view, \"create-user\")", "assert has_element(view, \"#user-form\")"],
+          assertions: [
+            "render_click(view, \"create-user\")",
+            "assert has_element(view, \"#user-form\")"
+          ],
           dependencies: ["Phoenix.LiveViewTest"],
           complexity_score: 1.8
         },

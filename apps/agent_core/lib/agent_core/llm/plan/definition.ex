@@ -106,7 +106,9 @@ defmodule AgentCore.Llm.Plan.Definition do
   end
 
   defp require_int(errors, field, value) do
-    if is_integer(value) and value >= 0, do: errors, else: [{field, :not_a_nonneg_integer} | errors]
+    if is_integer(value) and value >= 0,
+      do: errors,
+      else: [{field, :not_a_nonneg_integer} | errors]
   end
 
   defp validate_map(errors, field, value) do
@@ -115,8 +117,12 @@ defmodule AgentCore.Llm.Plan.Definition do
 
   defp validate_steps(errors, steps) do
     cond do
-      not is_list(steps) -> [{:steps, :not_a_list} | errors]
-      steps == [] -> [{:steps, :empty} | errors]
+      not is_list(steps) ->
+        [{:steps, :not_a_list} | errors]
+
+      steps == [] ->
+        [{:steps, :empty} | errors]
+
       true ->
         Enum.reduce(Enum.with_index(steps), errors, fn {step, idx}, acc ->
           cond do

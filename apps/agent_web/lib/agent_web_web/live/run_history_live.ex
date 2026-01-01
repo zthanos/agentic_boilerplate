@@ -53,7 +53,6 @@ defmodule AgentWebWeb.RunHistoryLive do
     apply_filters(socket, params)
   end
 
-
   @impl true
   def handle_event("set_limit", %{"limit" => limit}, socket) do
     limit =
@@ -145,7 +144,7 @@ defmodule AgentWebWeb.RunHistoryLive do
     <div class="p-6">
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">LLM Run History</h1>
-
+        
         <div class="flex items-center gap-2">
           <label class="text-sm">Limit</label>
           <input
@@ -159,7 +158,7 @@ defmodule AgentWebWeb.RunHistoryLive do
           />
         </div>
       </div>
-
+      
       <.form for={%{}} as={:filters} phx-submit="filter" class="mt-4">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
@@ -182,56 +181,56 @@ defmodule AgentWebWeb.RunHistoryLive do
           /> <button class="border rounded px-3 py-2" type="submit">Apply</button>
         </div>
       </.form>
-
+      
       <%= if @error do %>
         <div class="mt-4 border rounded p-3 text-sm"><strong>Error:</strong> {@error}</div>
       <% end %>
-
+      
       <div class="mt-4 overflow-auto border rounded">
         <table class="min-w-full text-sm">
           <thead class="border-b">
             <tr class="text-left">
               <th class="p-2">run_id</th>
-
+              
               <th class="p-2">trace_id</th>
-
+              
               <th class="p-2">phase</th>
-
+              
               <th class="p-2">status</th>
-
+              
               <th class="p-2">profile_id</th>
-
+              
               <th class="p-2">model</th>
-
+              
               <th class="p-2">latency</th>
-
+              
               <th class="p-2">started_at</th>
-
+              
               <th class="p-2">finished_at</th>
             </tr>
           </thead>
-
+          
           <tbody>
             <%= for r <- @runs do %>
               <tr class="border-b hover:bg-gray-50">
                 <td class="p-2 font-mono">
                   <a class="underline" href={~p"/api/runs/#{r.run_id}"} target="_blank">{r.run_id}</a>
                 </td>
-
+                
                 <td class="p-2 font-mono">{r.trace_id}</td>
-
+                
                 <td class="p-2">{r.phase}</td>
-
+                
                 <td class="p-2">{r.status}</td>
-
+                
                 <td class="p-2">{r.profile_id}</td>
-
+                
                 <td class="p-2">{r.model}</td>
-
+                
                 <td class="p-2">{format_latency(r.latency_ms)}</td>
-
+                
                 <td class="p-2">{format_dt(r.started_at)}</td>
-
+                
                 <td class="p-2">{format_dt(r.finished_at)}</td>
               </tr>
             <% end %>

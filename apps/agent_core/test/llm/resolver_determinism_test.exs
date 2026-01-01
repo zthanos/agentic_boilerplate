@@ -21,7 +21,6 @@ defmodule AgentCore.Llm.ResolverDeterminismTest do
 
     refute is_nil(c1.resolved_at)
     refute is_nil(c2.resolved_at)
-
   end
 
   test "fingerprint does not change when trace_id changes" do
@@ -80,8 +79,5 @@ defmodule AgentCore.Llm.ResolverDeterminismTest do
     assert cfg.trace_id == "t1"
     refute Map.has_key?(cfg.overrides, :trace_id)
     refute Map.has_key?(cfg.overrides, "trace_id")
-
-
   end
-
 end

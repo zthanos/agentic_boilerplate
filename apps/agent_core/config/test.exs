@@ -8,5 +8,4 @@ config :logger, level: :warning
 # ExUnit configuration
 ExUnit.start()
 
-config :agent_core, AgentCore.Llm.ProviderRouter,
-  openai: AgentCore.Llm.Providers.FakeProvider
+config :agent_core, AgentCore.Llm.ProviderRouter, openai: AgentCore.Llm.Providers.FakeProvider

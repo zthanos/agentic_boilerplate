@@ -28,7 +28,8 @@ defmodule AgentCore.Llm.Runs do
   Convenience helper: latest run for a given fingerprint (configuration).
   Not a primary identifier.
   """
-  @spec latest_by_fingerprint(String.t()) :: {:ok, RunSnapshot.t()} | {:error, :not_found} | {:error, term()}
+  @spec latest_by_fingerprint(String.t()) ::
+          {:ok, RunSnapshot.t()} | {:error, :not_found} | {:error, term()}
   def latest_by_fingerprint(fp) when is_binary(fp) do
     case store().list(fingerprint: fp, limit: 1) do
       {:ok, [snap | _]} -> {:ok, snap}
@@ -49,10 +50,12 @@ defmodule AgentCore.Llm.Runs do
   def mark_started(run_id), do: normalize_lifecycle(store().mark_started(run_id))
 
   @spec mark_finished(run_id(), map()) :: :ok | {:error, :not_found} | {:error, term()}
-  def mark_finished(run_id, outcome), do: normalize_lifecycle(store().mark_finished(run_id, outcome))
+  def mark_finished(run_id, outcome),
+    do: normalize_lifecycle(store().mark_finished(run_id, outcome))
 
   @spec mark_failed(run_id(), term(), map()) :: :ok | {:error, :not_found} | {:error, term()}
-  def mark_failed(run_id, reason, outcome), do: normalize_lifecycle(store().mark_failed(run_id, reason, outcome))
+  def mark_failed(run_id, reason, outcome),
+    do: normalize_lifecycle(store().mark_failed(run_id, reason, outcome))
 
   defp normalize_lifecycle({:ok, _run_id}), do: :ok
   defp normalize_lifecycle({:error, :not_found}), do: {:error, :not_found}

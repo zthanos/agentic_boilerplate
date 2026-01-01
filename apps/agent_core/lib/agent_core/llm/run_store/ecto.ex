@@ -50,7 +50,6 @@
 #     end
 #   end
 
-
 #   @impl true
 #   def get_by_fingerprint(fp) when is_binary(fp) do
 #     case Repo.get(RunRecord, fp) do
@@ -70,7 +69,6 @@
 
 #     {:ok, Repo.all(q) |> Enum.map(&to_snapshot/1)}
 #   end
-
 
 #   defp to_snapshot(%RunRecord{} = rec) do
 #     %RunSnapshot{
@@ -195,7 +193,5 @@
 #   defp normalize_error(other) do
 #     %{type: "error", value: inspect(other)}
 #   end
-
-
 
 # end

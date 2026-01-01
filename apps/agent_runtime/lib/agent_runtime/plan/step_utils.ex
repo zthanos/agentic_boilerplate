@@ -172,8 +172,6 @@ defmodule AgentRuntime.Llm.Plan.StepUtils do
     end
   end
 
-
-
   def enforce_null_when_false(map, bool_key, string_key) when is_map(map) do
     case boolean(map, bool_key, false) do
       true -> map

@@ -148,7 +148,10 @@ defmodule AgentCore.Llm.Validator do
     |> validate_provider_type(p.type)
     |> require_string("provider.base_url", p.base_url)
     |> validate_base_url(p.base_url)
-    |> validate_positive_int("provider.request_timeout_ms", p.request_timeout_ms, min: 1_000, max: 300_000)
+    |> validate_positive_int("provider.request_timeout_ms", p.request_timeout_ms,
+      min: 1_000,
+      max: 300_000
+    )
     |> validate_int_range("provider.retries", p.retries, min: 0, max: 10)
     |> validate_positive_int("provider.retry_backoff_ms", p.retry_backoff_ms, min: 0, max: 60_000)
     |> validate_map("provider.default_headers", p.default_headers)
@@ -167,10 +170,22 @@ defmodule AgentCore.Llm.Validator do
     errors =
       cond do
         uri.scheme not in ["http", "https"] ->
-          add_error(errors, "provider.base_url", :invalid, "base_url must start with http:// or https://", base_url)
+          add_error(
+            errors,
+            "provider.base_url",
+            :invalid,
+            "base_url must start with http:// or https://",
+            base_url
+          )
 
         is_nil(uri.host) ->
-          add_error(errors, "provider.base_url", :invalid, "base_url must include a host", base_url)
+          add_error(
+            errors,
+            "provider.base_url",
+            :invalid,
+            "base_url must include a host",
+            base_url
+          )
 
         true ->
           errors
@@ -179,7 +194,13 @@ defmodule AgentCore.Llm.Validator do
     if String.ends_with?(base_url, "/v1") do
       errors
     else
-      add_error(errors, "provider.base_url", :invalid, "base_url should typically end with /v1 for OpenAI-compatible servers", base_url)
+      add_error(
+        errors,
+        "provider.base_url",
+        :invalid,
+        "base_url should typically end with /v1 for OpenAI-compatible servers",
+        base_url
+      )
     end
   end
 
@@ -201,10 +222,18 @@ defmodule AgentCore.Llm.Validator do
     errors
     |> validate_float_range("generation.temperature", g.temperature, min: 0.0, max: 2.0)
     |> validate_float_range("generation.top_p", g.top_p, min: 0.0, max: 1.0)
-    |> validate_optional_pos_int("generation.max_output_tokens", g.max_output_tokens, max: 1_000_000)
+    |> validate_optional_pos_int("generation.max_output_tokens", g.max_output_tokens,
+      max: 1_000_000
+    )
     |> validate_optional_int_range("generation.seed", g.seed, min: 0, max: 2_147_483_647)
-    |> validate_optional_float_range("generation.presence_penalty", g.presence_penalty, min: -2.0, max: 2.0)
-    |> validate_optional_float_range("generation.frequency_penalty", g.frequency_penalty, min: -2.0, max: 2.0)
+    |> validate_optional_float_range("generation.presence_penalty", g.presence_penalty,
+      min: -2.0,
+      max: 2.0
+    )
+    |> validate_optional_float_range("generation.frequency_penalty", g.frequency_penalty,
+      min: -2.0,
+      max: 2.0
+    )
     |> validate_stop_list(g.stop)
   end
 
@@ -225,7 +254,13 @@ defmodule AgentCore.Llm.Validator do
     if valid? do
       errors
     else
-      add_error(errors, "generation.stop", :invalid, "stop must be a list of non-empty strings", stops)
+      add_error(
+        errors,
+        "generation.stop",
+        :invalid,
+        "stop must be a list of non-empty strings",
+        stops
+      )
     end
   end
 
@@ -236,20 +271,39 @@ defmodule AgentCore.Llm.Validator do
   defp validate_budgets(errors, %Budgets{} = b) do
     errors
     |> validate_optional_pos_int("budgets.max_input_tokens", b.max_input_tokens, max: 10_000_000)
-    |> validate_optional_pos_int("budgets.max_output_tokens", b.max_output_tokens, max: 10_000_000)
+    |> validate_optional_pos_int("budgets.max_output_tokens", b.max_output_tokens,
+      max: 10_000_000
+    )
     |> validate_optional_pos_int("budgets.max_total_tokens", b.max_total_tokens, max: 10_000_000)
-    |> validate_optional_float_range("budgets.max_cost_eur", b.max_cost_eur, min: 0.0, max: 10_000.0)
+    |> validate_optional_float_range("budgets.max_cost_eur", b.max_cost_eur,
+      min: 0.0,
+      max: 10_000.0
+    )
     |> validate_optional_pos_int("budgets.max_steps", b.max_steps, max: 1_000)
     |> validate_budget_consistency(b)
   end
 
   defp validate_budget_consistency(errors, %Budgets{} = b) do
     cond do
-      is_integer(b.max_total_tokens) and is_integer(b.max_input_tokens) and b.max_input_tokens > b.max_total_tokens ->
-        add_error(errors, "budgets.max_input_tokens", :invalid, "max_input_tokens cannot exceed max_total_tokens", b.max_input_tokens)
+      is_integer(b.max_total_tokens) and is_integer(b.max_input_tokens) and
+          b.max_input_tokens > b.max_total_tokens ->
+        add_error(
+          errors,
+          "budgets.max_input_tokens",
+          :invalid,
+          "max_input_tokens cannot exceed max_total_tokens",
+          b.max_input_tokens
+        )
 
-      is_integer(b.max_total_tokens) and is_integer(b.max_output_tokens) and b.max_output_tokens > b.max_total_tokens ->
-        add_error(errors, "budgets.max_output_tokens", :invalid, "max_output_tokens cannot exceed max_total_tokens", b.max_output_tokens)
+      is_integer(b.max_total_tokens) and is_integer(b.max_output_tokens) and
+          b.max_output_tokens > b.max_total_tokens ->
+        add_error(
+          errors,
+          "budgets.max_output_tokens",
+          :invalid,
+          "max_output_tokens cannot exceed max_total_tokens",
+          b.max_output_tokens
+        )
 
       true ->
         errors
@@ -289,7 +343,9 @@ defmodule AgentCore.Llm.Validator do
   end
 
   defp validate_map(errors, _field, value) when is_map(value), do: errors
-  defp validate_map(errors, field, value), do: add_error(errors, field, :invalid, "Expected a map", value)
+
+  defp validate_map(errors, field, value),
+    do: add_error(errors, field, :invalid, "Expected a map", value)
 
   defp validate_positive_int(errors, field, value, opts) do
     min = Keyword.get(opts, :min, 1)
@@ -343,7 +399,9 @@ defmodule AgentCore.Llm.Validator do
   end
 
   defp validate_optional_float_range(errors, _field, nil, _opts), do: errors
-  defp validate_optional_float_range(errors, field, value, opts), do: validate_float_range(errors, field, value, opts)
+
+  defp validate_optional_float_range(errors, field, value, opts),
+    do: validate_float_range(errors, field, value, opts)
 
   defp validate_optional_int_range(errors, _field, nil, _opts), do: errors
 

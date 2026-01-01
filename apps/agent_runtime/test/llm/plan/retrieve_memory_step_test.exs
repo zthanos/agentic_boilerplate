@@ -49,7 +49,8 @@ defmodule AgentRuntime.Llm.Plan.Steps.RetrieveMemoryStepTest do
     |> expect(:search, fn conversation_id, vector, top_k ->
       assert conversation_id == conv_id
       assert vector == [0.1, 0.2, 0.3]
-      assert top_k == 6  # default @top_k value
+      # default @top_k value
+      assert top_k == 6
       {:ok, [%{text: "User: I am Thanos", score: 0.62}]}
     end)
 

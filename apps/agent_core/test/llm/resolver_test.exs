@@ -110,7 +110,9 @@ defmodule AgentCore.Llm.ResolverTest do
     end
 
     test "tools supports atom and string, trims blanks, uniq + sorted" do
-      config = Resolver.resolve(@profile, %{tools: ["  ", :json_schema, "file_search", "file_search"]})
+      config =
+        Resolver.resolve(@profile, %{tools: ["  ", :json_schema, "file_search", "file_search"]})
+
       assert config.tools == ["file_search", "json_schema", "web_search"]
     end
 
@@ -165,6 +167,4 @@ defmodule AgentCore.Llm.ResolverTest do
       assert config.tools == ["file_search", "json_schema"]
     end
   end
-
-
 end

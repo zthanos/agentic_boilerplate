@@ -68,10 +68,11 @@ defmodule Mix.Tasks.TestAssessment do
       print_help()
     else
       # Get project path (default to current directory)
-      project_path = case args do
-        [path | _] -> Path.expand(path)
-        [] -> File.cwd!()
-      end
+      project_path =
+        case args do
+          [path | _] -> Path.expand(path)
+          [] -> File.cwd!()
+        end
 
       # Validate options
       format = validate_format(opts[:format] || "text")
@@ -80,11 +81,12 @@ defmodule Mix.Tasks.TestAssessment do
       validate_only = opts[:validate_only] || false
 
       # Set up progress callback
-      progress_callback = if verbose do
-        &verbose_progress_callback/1
-      else
-        &simple_progress_callback/1
-      end
+      progress_callback =
+        if verbose do
+          &verbose_progress_callback/1
+        else
+          &simple_progress_callback/1
+        end
 
       Mix.shell().info("Test Assessment System")
       Mix.shell().info("Project: #{project_path}")
@@ -121,7 +123,11 @@ defmodule Mix.Tasks.TestAssessment do
       {:error, reason} ->
         Mix.shell().error("✗ Invalid project structure: #{format_error(reason)}")
         Mix.shell().error("")
-        Mix.shell().error("Please ensure you're running this command from a valid Elixir/Phoenix project.")
+
+        Mix.shell().error(
+          "Please ensure you're running this command from a valid Elixir/Phoenix project."
+        )
+
         System.halt(1)
     end
   end
@@ -167,9 +173,15 @@ defmodule Mix.Tasks.TestAssessment do
 
   defp validate_format(format_str) do
     case String.downcase(format_str) do
-      "text" -> :text
-      "json" -> :json
-      "html" -> :html
+      "text" ->
+        :text
+
+      "json" ->
+        :json
+
+      "html" ->
+        :html
+
       invalid ->
         Mix.shell().error("Invalid format: #{invalid}. Valid formats: text, json, html")
         System.halt(1)

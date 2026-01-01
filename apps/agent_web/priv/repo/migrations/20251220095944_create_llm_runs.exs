@@ -21,5 +21,4 @@ defmodule AgentWeb.Repo.Migrations.CreateLlmRuns do
     create index(:llm_runs, [:resolved_at])
     create index(:llm_runs, [:provider, :model])
   end
-
 end

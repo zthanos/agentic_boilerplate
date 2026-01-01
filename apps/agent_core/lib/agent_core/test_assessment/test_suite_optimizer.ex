@@ -26,29 +26,35 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
   - `:reorganize` - Whether to reorganize test structure (default: true)
   - `:refactor_patterns` - Whether to refactor outdated patterns (default: true)
   """
-  @spec optimize_test_suite(AssessmentReport.t(), keyword()) :: {:ok, OptimizationResult.t()} | {:error, term()}
+  @spec optimize_test_suite(AssessmentReport.t(), keyword()) ::
+          {:ok, OptimizationResult.t()} | {:error, term()}
   def optimize_test_suite(assessment_report, opts \\ []) do
-    opts = Keyword.merge([
-      backup_dir: "test_backups",
-      dry_run: false,
-      remove_redundant: true,
-      reorganize: true,
-      refactor_patterns: true
-    ], opts)
+    opts =
+      Keyword.merge(
+        [
+          backup_dir: "test_backups",
+          dry_run: false,
+          remove_redundant: true,
+          reorganize: true,
+          refactor_patterns: true
+        ],
+        opts
+      )
 
     with {:ok, backup_dir} <- ensure_backup_directory(opts[:backup_dir]),
-         {:ok, removed_files} <- maybe_remove_redundant_tests(assessment_report.redundancy_findings, opts),
+         {:ok, removed_files} <-
+           maybe_remove_redundant_tests(assessment_report.redundancy_findings, opts),
          {:ok, reorganization_result} <- maybe_reorganize_tests(assessment_report, opts),
          {:ok, refactoring_results} <- maybe_refactor_patterns(assessment_report, opts),
          {:ok, test_run_result} <- verify_test_suite_if_not_dry_run(opts) do
-
       optimization_result = %OptimizationResult{
         removed_files: removed_files,
         modified_files: get_modified_files(reorganization_result, refactoring_results),
         reorganized_files: reorganization_result.moved_files,
         backup_directory: backup_dir,
         test_run_result: test_run_result,
-        optimization_summary: generate_optimization_summary(removed_files, reorganization_result, refactoring_results)
+        optimization_summary:
+          generate_optimization_summary(removed_files, reorganization_result, refactoring_results)
       }
 
       {:ok, optimization_result}
@@ -60,7 +66,8 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
   @doc """
   Removes redundant tests with safety checks, keeping the highest quality version.
   """
-  @spec remove_redundant_tests([RedundancyFinding.t()], keyword()) :: {:ok, [String.t()]} | {:error, term()}
+  @spec remove_redundant_tests([RedundancyFinding.t()], keyword()) ::
+          {:ok, [String.t()]} | {:error, term()}
   def remove_redundant_tests(redundancy_findings, opts \\ []) do
     dry_run = Keyword.get(opts, :dry_run, false)
     backup_dir = Keyword.get(opts, :backup_dir, "test_backups")
@@ -85,14 +92,14 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
   @doc """
   Reorganizes test files into appropriate directory structures with optimized naming.
   """
-  @spec reorganize_test_structure([ParsedTest.t()], String.t()) :: {:ok, ReorganizationResult.t()} | {:error, term()}
+  @spec reorganize_test_structure([ParsedTest.t()], String.t()) ::
+          {:ok, ReorganizationResult.t()} | {:error, term()}
   def reorganize_test_structure(tests, target_structure) do
     reorganization_plan = plan_test_reorganization(tests, target_structure)
 
     with {:ok, moved_files} <- execute_file_moves(reorganization_plan.moves),
          {:ok, created_dirs} <- create_target_directories(reorganization_plan.new_directories),
          {:ok, updated_imports} <- update_import_statements(reorganization_plan.import_updates) do
-
       result = %ReorganizationResult{
         moved_files: moved_files,
         created_directories: created_dirs,
@@ -109,7 +116,8 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
   @doc """
   Refactors tests using outdated Phoenix patterns to modern practices.
   """
-  @spec refactor_outdated_patterns([ParsedTest.t()]) :: {:ok, [RefactoringResult.t()]} | {:error, term()}
+  @spec refactor_outdated_patterns([ParsedTest.t()]) ::
+          {:ok, [RefactoringResult.t()]} | {:error, term()}
   def refactor_outdated_patterns(tests) do
     tests
     |> Enum.filter(&has_outdated_patterns?/1)
@@ -180,7 +188,8 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
         }
 
         Logger.error("Test suite verification failed with exit code #{exit_code}")
-        {:ok, result}  # Return success with failure details for analysis
+        # Return success with failure details for analysis
+        {:ok, result}
     end
   end
 
@@ -207,7 +216,13 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
       tests = extract_tests_from_report(assessment_report)
       reorganize_test_structure(tests, "standard")
     else
-      {:ok, %ReorganizationResult{moved_files: %{}, created_directories: [], updated_imports: [], conflicts: []}}
+      {:ok,
+       %ReorganizationResult{
+         moved_files: %{},
+         created_directories: [],
+         updated_imports: [],
+         conflicts: []
+       }}
     end
   end
 
@@ -222,7 +237,15 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
 
   defp verify_test_suite_if_not_dry_run(opts) do
     if Keyword.get(opts, :dry_run, false) do
-      {:ok, %TestRunResult{success: true, total_tests: 0, passed_tests: 0, failed_tests: 0, execution_time: 0.0, failure_details: []}}
+      {:ok,
+       %TestRunResult{
+         success: true,
+         total_tests: 0,
+         passed_tests: 0,
+         failed_tests: 0,
+         execution_time: 0.0,
+         failure_details: []
+       }}
     else
       verify_test_suite(".")
     end
@@ -230,7 +253,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
 
   defp should_remove_redundant_test?(redundancy_finding) do
     redundancy_finding.confidence_score >= 0.8 and
-    redundancy_finding.redundancy_type in [:identical_coverage, :duplicate_assertions]
+      redundancy_finding.redundancy_type in [:identical_coverage, :duplicate_assertions]
   end
 
   defp identify_tests_to_remove(redundancy_finding) do
@@ -259,6 +282,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
       {successes, []} ->
         removed_files = Enum.map(successes, fn {:ok, path} -> path end)
         {:ok, removed_files}
+
       {_successes, errors} ->
         {:error, {:partial_failure, errors}}
     end
@@ -288,12 +312,13 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
 
   defp plan_test_move(test, _target_structure) do
     # Simple heuristic: organize by test type
-    new_dir = case test.test_type do
-      :unit -> "test/unit"
-      :integration -> "test/integration"
-      :property_based -> "test/property"
-      _ -> "test/other"
-    end
+    new_dir =
+      case test.test_type do
+        :unit -> "test/unit"
+        :integration -> "test/integration"
+        :property_based -> "test/property"
+        _ -> "test/other"
+      end
 
     new_path = Path.join(new_dir, Path.basename(test.file_path))
 
@@ -323,6 +348,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
       {successes, []} ->
         moved_files = Enum.map(successes, fn {:ok, move} -> move end) |> Map.new()
         {:ok, moved_files}
+
       {_successes, errors} ->
         {:error, {:move_failures, errors}}
     end
@@ -341,6 +367,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
       {successes, []} ->
         created_dirs = Enum.map(successes, fn {:ok, dir} -> dir end)
         {:ok, created_dirs}
+
       {_successes, errors} ->
         {:error, {:directory_creation_failures, errors}}
     end
@@ -353,10 +380,11 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
 
   defp has_outdated_patterns?(test) do
     # Check for common outdated Phoenix test patterns
-    file_content = case File.read(test.file_path) do
-      {:ok, content} -> content
-      {:error, _} -> ""
-    end
+    file_content =
+      case File.read(test.file_path) do
+        {:ok, content} -> content
+        {:error, _} -> ""
+      end
 
     outdated_patterns = [
       ~r/Phoenix\.ConnTest\.build_conn/,
@@ -377,16 +405,20 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
         case File.write(test.file_path, refactored_content) do
           :ok ->
             Logger.info("Refactored outdated patterns in #{test.file_path}")
-            {:ok, %RefactoringResult{
-              file_path: test.file_path,
-              original_content: original_content,
-              refactored_content: refactored_content,
-              changes_applied: changes_applied,
-              warnings: []
-            }}
+
+            {:ok,
+             %RefactoringResult{
+               file_path: test.file_path,
+               original_content: original_content,
+               refactored_content: refactored_content,
+               changes_applied: changes_applied,
+               warnings: []
+             }}
+
           {:error, reason} ->
             {:error, {test.file_path, reason}}
         end
+
       {:error, reason} ->
         {:error, {test.file_path, reason}}
     end
@@ -413,6 +445,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
       {successes, []} ->
         refactoring_results = Enum.map(successes, fn {:ok, result} -> result end)
         {:ok, refactoring_results}
+
       {_successes, errors} ->
         {:error, {:refactoring_failures, errors}}
     end
@@ -444,15 +477,17 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
     total_regex = ~r/(\d+) tests?/
     failed_regex = ~r/(\d+) failures?/
 
-    total = case Regex.run(total_regex, output) do
-      [_, count] -> String.to_integer(count)
-      nil -> 0
-    end
+    total =
+      case Regex.run(total_regex, output) do
+        [_, count] -> String.to_integer(count)
+        nil -> 0
+      end
 
-    failed = case Regex.run(failed_regex, output) do
-      [_, count] -> String.to_integer(count)
-      nil -> 0
-    end
+    failed =
+      case Regex.run(failed_regex, output) do
+        [_, count] -> String.to_integer(count)
+        nil -> 0
+      end
 
     %{total: total, passed: total - failed, failed: failed}
   end
@@ -462,6 +497,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
     output
     |> String.split("\n")
     |> Enum.filter(&String.contains?(&1, "FAIL"))
-    |> Enum.take(10)  # Limit to first 10 failures
+    # Limit to first 10 failures
+    |> Enum.take(10)
   end
 end

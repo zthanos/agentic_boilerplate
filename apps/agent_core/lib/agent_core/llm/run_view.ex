@@ -1,5 +1,15 @@
 defmodule AgentCore.Llm.RunView do
-  @enforce_keys [:run_id, :trace_id, :fingerprint, :profile_id, :provider, :model, :policy_version, :resolved_at, :status]
+  @enforce_keys [
+    :run_id,
+    :trace_id,
+    :fingerprint,
+    :profile_id,
+    :provider,
+    :model,
+    :policy_version,
+    :resolved_at,
+    :status
+  ]
   defstruct [
     # identity / chaining
     :run_id,

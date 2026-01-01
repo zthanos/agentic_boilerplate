@@ -14,5 +14,4 @@ defmodule AgentRuntime.Llm.Runs do
 
   @spec get(String.t()) :: {:ok, RunView.t()} | {:error, :not_found} | {:error, term()}
   def get(run_id) when is_binary(run_id), do: CoreRuns.get(run_id)
-
 end

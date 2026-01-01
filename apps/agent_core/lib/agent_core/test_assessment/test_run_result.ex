@@ -4,13 +4,13 @@ defmodule AgentCore.TestAssessment.TestRunResult do
   """
 
   @type t :: %__MODULE__{
-    success: boolean(),
-    total_tests: integer(),
-    passed_tests: integer(),
-    failed_tests: integer(),
-    execution_time: float(),
-    failure_details: [String.t()]
-  }
+          success: boolean(),
+          total_tests: integer(),
+          passed_tests: integer(),
+          failed_tests: integer(),
+          execution_time: float(),
+          failure_details: [String.t()]
+        }
 
   defstruct [
     :success,

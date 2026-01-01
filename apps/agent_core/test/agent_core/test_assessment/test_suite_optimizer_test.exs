@@ -84,8 +84,11 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizerTest do
 
       opts = [dry_run: true]
 
-      assert {:ok, removed_files} = TestSuiteOptimizer.remove_redundant_tests(redundancy_findings, opts)
-      assert length(removed_files) == 2  # Should keep first, remove others
+      assert {:ok, removed_files} =
+               TestSuiteOptimizer.remove_redundant_tests(redundancy_findings, opts)
+
+      # Should keep first, remove others
+      assert length(removed_files) == 2
       assert "test_b.exs" in removed_files
       assert "test_c.exs" in removed_files
       refute "test_a.exs" in removed_files
@@ -96,7 +99,8 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizerTest do
         %RedundancyFinding{
           test_names: ["test_a.exs", "test_b.exs"],
           redundancy_type: :similar_logic,
-          confidence_score: 0.5,  # Below threshold
+          # Below threshold
+          confidence_score: 0.5,
           recommended_action: "review",
           justification: "Similar but not identical"
         }
@@ -104,7 +108,9 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizerTest do
 
       opts = [dry_run: true]
 
-      assert {:ok, removed_files} = TestSuiteOptimizer.remove_redundant_tests(redundancy_findings, opts)
+      assert {:ok, removed_files} =
+               TestSuiteOptimizer.remove_redundant_tests(redundancy_findings, opts)
+
       assert removed_files == []
     end
   end
@@ -157,6 +163,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizerTest do
     test "identifies tests with outdated patterns" do
       # Create a temporary test file with outdated patterns
       test_file = "test_outdated.exs"
+
       outdated_content = """
       defmodule TestModule do
         use ExUnit.Case
