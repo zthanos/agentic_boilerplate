@@ -11,6 +11,67 @@ import topbar from "../vendor/topbar"
 
 const Hooks = {}
 
+Hooks.WorkflowNodeTooltip = {
+  mounted() {
+    this.nodeId = this.el.dataset.nodeId;
+    this.tooltip = document.getElementById(`tooltip-${this.nodeId}`);
+    
+    if (this.tooltip) {
+      this.el.addEventListener('mouseenter', this.showTooltip.bind(this));
+      this.el.addEventListener('mouseleave', this.hideTooltip.bind(this));
+      this.el.addEventListener('mousemove', this.updateTooltipPosition.bind(this));
+    }
+  },
+
+  destroyed() {
+    if (this.tooltip) {
+      this.el.removeEventListener('mouseenter', this.showTooltip.bind(this));
+      this.el.removeEventListener('mouseleave', this.hideTooltip.bind(this));
+      this.el.removeEventListener('mousemove', this.updateTooltipPosition.bind(this));
+    }
+  },
+
+  showTooltip(event) {
+    if (this.tooltip) {
+      this.tooltip.classList.remove('hidden');
+      this.updateTooltipPosition(event);
+    }
+  },
+
+  hideTooltip() {
+    if (this.tooltip) {
+      this.tooltip.classList.add('hidden');
+    }
+  },
+
+  updateTooltipPosition(event) {
+    if (this.tooltip && !this.tooltip.classList.contains('hidden')) {
+      const rect = this.el.getBoundingClientRect();
+      const tooltipRect = this.tooltip.getBoundingClientRect();
+      
+      // Position tooltip above the node, centered
+      let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+      let top = rect.top - tooltipRect.height - 10;
+      
+      // Ensure tooltip stays within viewport
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      if (left < 10) left = 10;
+      if (left + tooltipRect.width > viewportWidth - 10) {
+        left = viewportWidth - tooltipRect.width - 10;
+      }
+      
+      if (top < 10) {
+        // If no room above, show below
+        top = rect.bottom + 10;
+      }
+      
+      this.tooltip.style.left = `${left}px`;
+      this.tooltip.style.top = `${top}px`;
+    }
+  }
+};
 
 Hooks.AutoScroll = {
   mounted() {

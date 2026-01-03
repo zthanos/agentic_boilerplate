@@ -17,12 +17,39 @@
 import Config
 
 # -----------------------------------------------------------------------------
-# Core (domain) wiring: façades select store implementation via config
+# Agent Infra (Database) Configuration
+# -----------------------------------------------------------------------------
+config :agent_infra, AgentInfra.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  port: 15432,
+  database: "agent_infra_dev",
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
+
+config :agent_infra, ecto_repos: [AgentInfra.Repo]
+
+# -----------------------------------------------------------------------------
+# Agent Core: LLM store configurations
 # -----------------------------------------------------------------------------
 
-config :agent_core, AgentCore.Llm.Profiles, store: AgentWeb.Llm.ProfileStoreEcto
+config :agent_core, AgentCore.Llm.Profiles, store: AgentInfra.StoreEcto.LLMProfileStore
+config :agent_core, AgentCore.Llm.Agents, store: AgentInfra.StoreEcto.AgentStore
+config :agent_core, AgentCore.Llm.Runs, store: AgentInfra.StoreEcto.RunStore
 
-config :agent_core, AgentCore.Llm.Runs, store: AgentWeb.Llm.RunStoreEcto
+# -----------------------------------------------------------------------------
+# Agent Runtime: Store behavior implementations configuration
+# -----------------------------------------------------------------------------
+
+config :agent_runtime,
+  run_store_impl: AgentInfra.StoreEcto.RunStore,
+  profile_store_impl: AgentInfra.StoreEcto.ProfileStore,
+  provider_store_impl: AgentInfra.StoreEcto.ProviderStore,
+  workflow_store_impl: AgentInfra.StoreEcto.WorkflowStore,
+  conversation_store_impl: AgentInfra.StoreEcto.ConversationStore,
+  memory_chunk_store_impl: AgentInfra.StoreEcto.MemoryChunkStore
 
 # config/config.exs
 config :mime, :types, %{
@@ -40,8 +67,21 @@ config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
     connect_timeout_ms: 10_000
   ]
 
+# -----------------------------------------------------------------------------
+# Agent Runtime: App startup order and dependencies
+# -----------------------------------------------------------------------------
+
+config :agent_runtime,
+  # Ensure agent_infra starts before agent_runtime
+  included_applications: [:agent_infra]
+
+# -----------------------------------------------------------------------------
+# Agent Web: Runtime API configuration
+# -----------------------------------------------------------------------------
+
 config :agent_web,
-  ecto_repos: [AgentWeb.Repo],
+  # Configure agent_web to use only agent_runtime APIs
+  agent_runtime_module: AgentRuntime.Agent,
   generators: [timestamp_type: :utc_datetime]
 
 # Configures the endpoint

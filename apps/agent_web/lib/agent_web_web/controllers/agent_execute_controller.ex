@@ -27,8 +27,7 @@ defmodule AgentWebWeb.AgentExecuteController do
           exec_meta,
           on_chunk,
           agent_id: agent_id,
-          agent_version: agent_version,
-          memory_store: AgentWeb.Memory.Store
+          agent_version: agent_version
         )
       end)
     else

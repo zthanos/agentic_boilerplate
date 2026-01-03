@@ -7,6 +7,9 @@ defmodule AgentRuntime.Application do
 
   @impl true
   def start(_type, _args) do
+    # Create ETS table for tracking async executions
+    :ets.new(:agent_executions, [:named_table, :public, :set])
+
     children = [
       {Finch,
        name: AgentRuntimeFinch,
@@ -16,7 +19,13 @@ defmodule AgentRuntime.Application do
            size: 10,
            count: 1
          ]
-       }}
+       }},
+      # Workflow execution manager
+      AgentRuntime.Workflows.ExecutionManager,
+      # Provider registry
+      AgentRuntime.Providers.Registry,
+      # Tool registry
+      AgentRuntime.Tools.Registry
       # Starts a worker by calling: AgentRuntime.Worker.start_link(arg)
       # {AgentRuntime.Worker, arg}
     ]

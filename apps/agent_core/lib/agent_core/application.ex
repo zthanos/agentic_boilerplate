@@ -32,8 +32,9 @@ defmodule AgentCore.Application do
 
   # Register default workflows with the registry
   defp register_default_workflows do
-    # Import the history workflow specification
+    # Import the workflow specifications
     alias AgentCore.WorkflowEngine.HistoryWorkflow
+    alias AgentCore.WorkflowEngine.RagConversationWorkflow
 
     # Register the history RAG workflow
     case HistoryWorkflow.register() do
@@ -44,6 +45,18 @@ defmodule AgentCore.Application do
         # Log error but don't crash the application
         require Logger
         Logger.error("Failed to register history workflow: #{inspect(reason)}")
+        :ok
+    end
+
+    # Register the RAG conversation workflow
+    case RagConversationWorkflow.register_workflow() do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        # Log error but don't crash the application
+        require Logger
+        Logger.error("Failed to register RAG conversation workflow: #{inspect(reason)}")
         :ok
     end
   end

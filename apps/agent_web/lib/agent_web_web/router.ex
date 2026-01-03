@@ -25,6 +25,7 @@ defmodule AgentWebWeb.Router do
     live "/chat/:conversation_id/plan", PlanExecuteLive, :index
     live "/conversations", ChatExecuteLive, :index
     live "/conversations/:conversation_id", ChatExecuteLive, :index
+    live "/agent-testing", AgentTestingLive, :index
   end
 
   pipeline :sse do

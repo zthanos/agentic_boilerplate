@@ -7,12 +7,12 @@
           <h1 class="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Plan Execute
           </h1>
-          
+
           <span class="badge badge-success badge-lg">
             <span class="inline-block w-2 h-2 bg-success rounded-full mr-1"></span> Active
           </span>
         </div>
-        
+
         <div class="text-sm text-base-content/70 mt-2">
           <span class="font-medium">Conversation:</span>
           <span class="font-mono ml-2 bg-base-200 px-2 py-1 rounded">
@@ -30,7 +30,7 @@
           </a>
         </div>
       </div>
-      
+
       <div class="flex items-center gap-4">
         <a
           href={~p"/conversations"}
@@ -76,7 +76,7 @@
             </svg>
             Configuration
           </h3>
-          
+
           <form phx-submit="execute" class="space-y-4">
             <!-- Agent Selection -->
             <label class="text-sm text-slate-300">Agent</label>
@@ -111,7 +111,7 @@
                   <option value="new" selected={@conversation_id == "new" or !@conversation_id}>
                     New Conversation
                   </option>
-                  
+
                   <%= for c <- (@conversations || []) do %>
                     <option value={c.id} selected={c.id == @conversation_id}>
                       {c.name || c.id}
@@ -149,7 +149,8 @@
               <label class="label">
                 <span class="label-text">Prompt</span>
                 <span class="label-text-alt">Markdown supported</span>
-              </label> <textarea
+              </label>
+              <textarea
                 name="prompt"
                 rows="10"
                 class="textarea textarea-bordered w-full font-mono text-sm"
@@ -185,7 +186,7 @@
               </div>
             </button>
           </form>
-          
+
           <%= if @error do %>
             <div class="alert alert-error mt-4">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -198,7 +199,7 @@
               </svg>
               <div>
                 <h3 class="font-semibold">Execution Error</h3>
-                 <pre class="text-sm whitespace-pre-wrap"><%= inspect(@error, pretty: true) %></pre>
+                <pre class="text-sm whitespace-pre-wrap"><%= inspect(@error, pretty: true) %></pre>
               </div>
             </div>
           <% end %>
@@ -206,20 +207,20 @@
         <!-- Quick Stats -->
         <div class="bg-base-200/50 backdrop-blur-sm border border-base-300 rounded-box p-5">
           <h3 class="text-lg font-semibold mb-4">Session Info</h3>
-          
+
           <div class="space-y-3">
             <div class="flex justify-between items-center">
               <span class="text-base-content/70">Messages</span>
               <span class="font-semibold">{length(@messages)}</span>
             </div>
-            
+
             <div class="flex justify-between items-center">
               <span class="text-base-content/70">Status</span>
               <span class={["badge", if(@streaming, do: "badge-success", else: "badge-neutral")]}>
                 {if @streaming, do: "Streaming", else: "Ready"}
               </span>
             </div>
-            
+
             <div class="flex justify-between items-center">
               <span class="text-base-content/70">Current Conversation</span>
               <span class="font-medium text-sm truncate max-w-[120px]">
@@ -260,7 +261,7 @@
                   </span>
                 <% end %>
               </h3>
-              
+
               <div class="flex items-center gap-2">
                 <%= if @conversation_id && @conversation_id != "new" do %>
                   <a
@@ -278,7 +279,7 @@
                     </svg>
                   </a>
                 <% end %>
-                
+
                 <button
                   class="btn btn-ghost btn-sm"
                   title="Clear Conversation"

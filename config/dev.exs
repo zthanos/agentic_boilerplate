@@ -1,7 +1,7 @@
 import Config
 
 # -----------------------------------------------------------------------------
-# agent_web Repo (SQLite)
+# Agent Infra Repo (Development)
 # -----------------------------------------------------------------------------
 
 # For development, we disable any cache and enable

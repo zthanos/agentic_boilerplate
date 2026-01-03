@@ -230,3 +230,129 @@
 
 - [x] 7. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise
+
+- [-] 8. Implement RAG-enhanced conversation workflow for complete conversational AI processing
+  - Create comprehensive conversation workflow that uses LLM query generation, vector retrieval, prompt enhancement, and clarification assessment
+  - Implement workflow specification with intelligent routing between response generation and clarification collection
+  - Add integration with existing vector database and LLM infrastructure without plan system dependencies
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 11.1, 11.2, 11.3, 11.4, 11.5_
+
+- [x] 8.1 Create RagConversationWorkflow.GenerateQueryStep
+  - Implement LLM-based query generation from user messages for vector database search
+  - Add structured query formatting optimized for conversation history retrieval
+  - Create fallback logic for cases where LLM query generation fails
+  - _Requirements: 10.1, 11.1_
+
+- [x] 8.2 Create RagConversationWorkflow.RetrieveContextStep
+  - Implement vector database integration for retrieving relevant conversation history
+  - Add semantic similarity scoring and context ranking logic
+  - Handle empty results and search optimization without plan system dependencies
+  - _Requirements: 10.2, 11.2_
+
+- [x] 8.3 Create RagConversationWorkflow.EnhancePromptStep
+  - Implement intelligent prompt augmentation with retrieved historical context
+  - Add structured context formatting that preserves conversation flow
+  - Create workflow-specific prompt enhancement without reusing plan formatting utilities
+  - _Requirements: 10.3, 11.3_
+
+- [x] 8.4 Create RagConversationWorkflow.AssessClarificationStep
+  - Implement LLM-based clarification need assessment for enhanced prompts
+  - Add decision logic for routing between direct response and clarification collection
+  - Create workflow-specific clarification logic independent of plan system clarification modules
+  - _Requirements: 10.4, 11.4_
+
+- [x] 8.5 Create RagConversationWorkflow.FinalResponseStep
+  - Implement final LLM response generation using enhanced prompts
+  - Add response formatting and metadata collection for conversation completion
+  - Handle response generation errors with workflow-specific error handling
+  - _Requirements: 10.5, 11.5_
+
+- [x] 8.6 Create RagConversationWorkflow.CollectClarificationStep
+  - Implement clarification question presentation and user interaction handling
+  - Add clarification collection logic with proper user interface integration
+  - Create clarification workflow completion with enhanced prompt regeneration
+  - _Requirements: 10.6, 11.5_
+
+- [ ]* 8.7 Write property test for RAG-enhanced conversation workflow behavior
+  - **Property 10: RAG-enhanced conversation workflow behavior**
+  - **Validates: Requirements 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7**
+
+- [ ]* 8.8 Write property test for workflow infrastructure independence
+  - **Property 11: Workflow infrastructure independence**
+  - **Validates: Requirements 11.1, 11.2, 11.3, 11.4, 11.5**
+
+- [x] 8.9 Create comprehensive RAG conversation workflow specification
+  - Define complete workflow spec with all six nodes and intelligent routing logic
+  - Add sophisticated predicate functions for conversation flow management
+  - Register workflow in registry with full step integration and proper error handling
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7_
+
+- [ ]* 8.10 Write comprehensive integration tests for RAG conversation workflow
+  - Test complete end-to-end conversation processing with all workflow steps
+  - Test various conversation scenarios including clarification needs and direct responses
+  - Test error handling and edge cases across the entire conversation pipeline
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 11.1, 11.2, 11.3, 11.4, 11.5_
+
+- [ ] 9. Update existing AssessNeedStep to follow RAG conversation workflow pattern
+  - Modify existing HistoryWorkflow.AssessNeedStep to use LLM query generation approach
+  - Update step logic to match the pattern established in AssessNeedForHistoryStep but within workflow context
+  - Ensure proper integration with workflow engine context and error handling
+  - _Requirements: 10.1, 11.1, 11.5_
+
+- [ ] 9.1 Refactor AssessNeedStep implementation
+  - Update step to use LLM for generating structured queries instead of simple boolean assessment
+  - Add proper query generation logic following the pattern from plan system but adapted for workflow context
+  - Maintain workflow engine context handling and decision storage patterns
+  - _Requirements: 10.1, 11.1_
+
+- [ ]* 9.2 Write unit tests for updated AssessNeedStep
+  - Test LLM query generation functionality with various user message inputs
+  - Test error handling and fallback behavior when LLM calls fail
+  - Test proper workflow context integration and decision storage
+  - _Requirements: 10.1, 11.1, 11.5_
+
+- [ ] 10. Final integration checkpoint - Ensure all workflow tests pass
+  - Ensure all workflow engine tests pass including new RAG conversation workflow
+  - Verify proper integration between existing history workflow and new conversation workflow
+  - Ask the user if questions arise regarding workflow implementation
+
+- [ ] 11. Implement real-time workflow graph progress visualization
+  - Add structured progress events for workflow step execution status
+  - Update SSE Manager to handle workflow progress events in addition to token events
+  - Update LiveView to process workflow progress events and update graph state in real-time
+  - _Requirements: 12.1, 12.2, 12.3, 12.4_
+
+- [ ] 11.1 Add structured workflow progress events to runtime
+  - Modify WorkflowEngine.Runtime to send structured step progress events
+  - Create WorkflowProgressEvent struct for step status updates (start, complete, error)
+  - Integrate progress events with existing streaming callback system
+  - _Requirements: 12.1_
+
+- [ ] 11.2 Update SSE Manager for workflow progress events
+  - Extend SseManager to handle workflow progress events as separate event type
+  - Add new SSE event types: workflow_step_start, workflow_step_complete, workflow_step_error
+  - Ensure workflow progress events are sent alongside token streaming events
+  - _Requirements: 12.2_
+
+- [ ] 11.3 Update JavaScript SSE hook for workflow progress
+  - Extend LlmSSE hook to parse and handle workflow progress events
+  - Add event handlers for workflow_step_start, workflow_step_complete, workflow_step_error
+  - Send workflow progress events to LiveView for graph state updates
+  - _Requirements: 12.3_
+
+- [ ] 11.4 Update LiveView for real-time workflow graph updates
+  - Add workflow progress event handlers to AgentTestingLive
+  - Update workflow_execution_state assign based on step progress events
+  - Ensure WorkflowGraphComponent receives real-time execution state updates
+  - _Requirements: 12.4_
+
+- [ ]* 11.5 Write integration tests for workflow graph progress visualization
+  - Test end-to-end workflow progress from runtime to UI graph updates
+  - Test step status transitions (pending → running → completed/failed)
+  - Test real-time graph visualization updates during workflow execution
+  - _Requirements: 12.1, 12.2, 12.3, 12.4_
+
+- [ ] 12. Final checkpoint - Ensure workflow graph progress visualization works
+  - Test complete workflow execution with real-time graph updates
+  - Verify step progress is visible in both chat messages and graph visualization
+  - Ask the user if questions arise regarding workflow graph implementation

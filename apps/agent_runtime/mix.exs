@@ -20,7 +20,9 @@ defmodule AgentRuntime.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {AgentRuntime.Application, []}
+      mod: {AgentRuntime.Application, []},
+      # Ensure agent_infra starts before agent_runtime
+      included_applications: [:agent_infra]
     ]
   end
 
@@ -28,6 +30,7 @@ defmodule AgentRuntime.MixProject do
   defp deps do
     [
       {:agent_core, in_umbrella: true},
+      {:agent_infra, in_umbrella: true},
       {:finch, "~> 0.19"},
       {:jason, "~> 1.4"},
       {:ex_json_schema, "~> 0.10"},

@@ -131,3 +131,28 @@ This document specifies the requirements for implementing a generic workflow eng
 3. WHEN workflows integrate with LLMs THEN the integration SHALL be handled within the workflow steps without exposing LLM details to agents or controllers
 4. WHEN system components communicate THEN they SHALL use well-defined interfaces that support independent testing and deployment
 5. WHEN errors occur at any layer THEN they SHALL be properly propagated through the agent → controller → UI chain with appropriate error handling
+
+### Requirement 10
+
+**User Story:** As a conversational AI system, I want to implement a RAG-enhanced conversation workflow that intelligently augments user prompts with relevant historical context, so that I can provide more accurate and contextually aware responses.
+
+#### Acceptance Criteria
+
+1. WHEN a user sends a message THEN the System SHALL use an LLM to generate a structured query for retrieving relevant historical context from the vector database
+2. WHEN the LLM generates a history query THEN the System SHALL execute the query against the conversation history vector database to retrieve semantically similar content
+3. WHEN relevant historical context is retrieved THEN the System SHALL enhance the original user prompt by incorporating the retrieved context in a structured format
+4. WHEN the enhanced prompt is created THEN the System SHALL pass it to a clarification assessment workflow step to determine if user clarification is needed
+5. WHEN clarification is not needed THEN the System SHALL send the enhanced prompt directly to the LLM for final response generation
+6. WHEN clarification is needed THEN the System SHALL present clarification questions to the user before proceeding with response generation
+7. WHEN no relevant historical context is found THEN the System SHALL proceed with the original user prompt unchanged through the clarification assessment process
+
+### Requirement 12
+
+**User Story:** As a user monitoring workflow execution, I want real-time visual feedback on workflow progress, so that I can see which steps are currently executing, completed, or failed in the workflow graph visualization.
+
+#### Acceptance Criteria
+
+1. WHEN a workflow step begins execution THEN the System SHALL send structured progress events indicating step start with step ID and timestamp
+2. WHEN a workflow step completes execution THEN the System SHALL send structured progress events indicating step completion with step ID, execution time, and status
+3. WHEN workflow progress events are generated THEN the System SHALL transmit them through the SSE streaming system alongside token events for real-time delivery
+4. WHEN the UI receives workflow progress events THEN the System SHALL update the workflow graph visualization to show current step status (pending, running, completed, failed) with visual indicators

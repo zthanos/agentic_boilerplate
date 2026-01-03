@@ -91,7 +91,8 @@ defmodule AgentCore.WorkflowEngine.LlmIntegration do
       %{content: "Enhanced prompt", metadata: %{...}, integration_type: :history_rag, ...}
   """
   @spec format_for_llm(WorkflowResult.t() | map(), llm_config()) :: formatted_result()
-  def format_for_llm(workflow_result, llm_config) when is_map(workflow_result) and is_map(llm_config) do
+  def format_for_llm(workflow_result, llm_config)
+      when is_map(workflow_result) and is_map(llm_config) do
     formatter = Map.get(llm_config, :result_formatter, :generic)
 
     formatted_content = apply_formatter(workflow_result, formatter)
@@ -118,7 +119,8 @@ defmodule AgentCore.WorkflowEngine.LlmIntegration do
       iex> LlmIntegration.create_llm_request(workflow_result, llm_config, context)
       %ProviderRequest{...}
   """
-  @spec create_llm_request(WorkflowResult.t() | map(), llm_config(), llm_request_context()) :: ProviderRequest.t()
+  @spec create_llm_request(WorkflowResult.t() | map(), llm_config(), llm_request_context()) ::
+          ProviderRequest.t()
   def create_llm_request(workflow_result, llm_config, context \\ %{}) do
     formatted_result = format_for_llm(workflow_result, llm_config)
 
@@ -128,7 +130,8 @@ defmodule AgentCore.WorkflowEngine.LlmIntegration do
     ProviderRequest.new(
       invocation_config,
       input,
-      [],  # tools - could be extended based on workflow needs
+      # tools - could be extended based on workflow needs
+      [],
       build_request_metadata(formatted_result, context)
     )
   end
@@ -159,7 +162,8 @@ defmodule AgentCore.WorkflowEngine.LlmIntegration do
       :ok
   """
   @spec register_formatter(atom(), function()) :: :ok
-  def register_formatter(formatter_name, formatter_fn) when is_atom(formatter_name) and is_function(formatter_fn, 1) do
+  def register_formatter(formatter_name, formatter_fn)
+      when is_atom(formatter_name) and is_function(formatter_fn, 1) do
     :persistent_term.put({__MODULE__, :formatter, formatter_name}, formatter_fn)
     :ok
   end
@@ -332,15 +336,21 @@ defmodule AgentCore.WorkflowEngine.LlmIntegration do
 
   defp validate_formatter(llm_config) do
     case Map.get(llm_config, :result_formatter) do
-      nil -> :ok
+      nil ->
+        :ok
+
       formatter when is_atom(formatter) ->
         if formatter in list_formatters() do
           :ok
         else
           {:error, "Unknown formatter: #{formatter}"}
         end
-      formatter when is_function(formatter, 1) -> :ok
-      _ -> {:error, "Formatter must be an atom or function/1"}
+
+      formatter when is_function(formatter, 1) ->
+        :ok
+
+      _ ->
+        {:error, "Formatter must be an atom or function/1"}
     end
   end
 
@@ -389,6 +399,7 @@ defmodule AgentCore.WorkflowEngine.LlmIntegration do
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Map.new()
   end
+
   defp extract_key_artifacts(_), do: %{}
 
   defp extract_performance_metrics(%{trace: trace}) when is_list(trace) do
@@ -398,11 +409,13 @@ defmodule AgentCore.WorkflowEngine.LlmIntegration do
       step_performance: extract_step_performance(trace)
     }
   end
+
   defp extract_performance_metrics(_), do: %{}
 
   defp extract_error_context(%{error: error}) when not is_nil(error) do
     %{has_error: true, error_details: format_value(error)}
   end
+
   defp extract_error_context(_), do: %{has_error: false}
 
   defp calculate_total_time(trace) do

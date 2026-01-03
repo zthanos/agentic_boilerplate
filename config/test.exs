@@ -2,13 +2,16 @@
 import Config
 
 # -----------------------------------------------------------------------------
-# agent_web Repo (Postgres)
+# Agent Infra (Database) Configuration for Testing
 # -----------------------------------------------------------------------------
-config :agent_web, AgentWeb.Repo,
-  url: "ecto://postgres:postgres@localhost:15432/agent_web_test",
+config :agent_infra, AgentInfra.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  port: 15432,
+  database: "agent_infra_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: 5,
-  types: AgentWeb.PostgrexTypes
+  pool_size: System.schedulers_online() * 2
 
 # -----------------------------------------------------------------------------
 # agent_web Endpoint (no server in test)
@@ -28,11 +31,16 @@ config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
 # -----------------------------------------------------------------------------
-# agent_core LLM wiring (tests)
+# Agent Runtime: Store behavior implementations for testing
 # -----------------------------------------------------------------------------
-config :agent_core, AgentCore.Llm.Runs, store: AgentCore.Llm.RunStore.Ecto
 
-config :agent_core, AgentCore.Llm.ProviderRouter, openai: AgentCore.Llm.Providers.FakeProvider
+config :agent_runtime,
+  run_store_impl: AgentInfra.StoreEcto.RunStore,
+  profile_store_impl: AgentInfra.StoreEcto.ProfileStore,
+  provider_store_impl: AgentInfra.StoreEcto.ProviderStore,
+  workflow_store_impl: AgentInfra.StoreEcto.WorkflowStore,
+  conversation_store_impl: AgentInfra.StoreEcto.ConversationStore,
+  memory_chunk_store_impl: AgentInfra.StoreEcto.MemoryChunkStore
 
 config :agent_runtime, AgentRuntime.Llm.ProviderConfig,
   openai_compatible: [

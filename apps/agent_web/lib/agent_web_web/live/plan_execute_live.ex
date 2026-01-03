@@ -5,8 +5,8 @@ defmodule AgentWebWeb.PlanExecuteLive do
   import AgentWebWeb.MessagesComponent
   import AgentWebWeb.ResultsComponent
 
-  alias AgentWeb.Llm.ProfileStoreEcto
-  alias AgentWeb.Llm.AgentStoreEcto
+  alias AgentCore.Llm.Profiles
+  alias AgentRuntime.Llm.Agent.Store, as: AgentStoreDI
 
   @default_profile_id "req_llm"
   @stream_endpoint "/api/agents/execute/stream"
@@ -15,8 +15,8 @@ defmodule AgentWebWeb.PlanExecuteLive do
   @impl true
   def mount(%{"conversation_id" => conversation_id}, _session, socket) do
     with {:ok, _} <- Ecto.UUID.cast(conversation_id) do
-      # AgentStoreEcto.list returns {:ok, list}
-      {:ok, agents} = AgentStoreEcto.list(status: "active")
+      # AgentStoreDI.impl!().list returns {:ok, list}
+      {:ok, agents} = AgentStoreDI.impl!().list(status: "active")
 
       selected_agent_id =
         cond do
@@ -25,8 +25,8 @@ defmodule AgentWebWeb.PlanExecuteLive do
           true -> @default_agent_id
         end
 
-      # ProfileStoreEcto.list returns just the list, not a tuple
-      profiles = ProfileStoreEcto.list([])
+      # Profiles.list returns just the list, not a tuple
+      profiles = Profiles.list([])
 
       selected_profile_id =
         cond do

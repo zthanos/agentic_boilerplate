@@ -1,6 +1,6 @@
 defmodule AgentWebWeb.ChatExecuteLive do
   use AgentWebWeb, :live_view
-  alias AgentWeb.Llm.ProfileStoreEcto
+  alias AgentCore.Llm.Profiles
 
   @default_profile_id "req_llm"
 
@@ -13,7 +13,7 @@ defmodule AgentWebWeb.ChatExecuteLive do
   def mount(_params, _session, socket) do
     trace_id = new_trace_id()
 
-    profiles = ProfileStoreEcto.list([])
+    profiles = Profiles.list([])
 
     selected_profile_id =
       cond do
@@ -212,16 +212,16 @@ defmodule AgentWebWeb.ChatExecuteLive do
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-2xl font-semibold">LLM Execute</h1>
-            
+
             <div class="text-xs text-slate-400 mt-1">
               session trace_id: <span class="font-mono">{@trace_id}</span> <span class="mx-2">•</span>
               <a class="underline" href={~p"/runs?trace_id=#{@trace_id}"}>open history</a>
             </div>
           </div>
-          
+
           <div class="flex gap-3 text-sm"><a class="underline" href={~p"/runs"}>History</a></div>
         </div>
-        
+
         <div class="mt-6 grid grid-cols-1 lg:grid-cols-5 gap-4">
           <!-- Left: form -->
           <div class="lg:col-span-2 border border-slate-700 rounded-lg p-4 bg-slate-800">
@@ -249,7 +249,7 @@ defmodule AgentWebWeb.ChatExecuteLive do
                     placeholder="leave as-is to keep session trace"
                   />
                 </div>
-                
+
                 <div>
                   <label class="block text-sm mb-1 text-slate-300">phase (optional)</label>
                   <select
@@ -257,18 +257,18 @@ defmodule AgentWebWeb.ChatExecuteLive do
                     class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700"
                   >
                     <option value="" selected={@phase == ""}>—</option>
-                    
+
                     <option value="draft" selected={@phase == "draft"}>draft</option>
-                    
+
                     <option value="critique" selected={@phase == "critique"}>critique</option>
-                    
+
                     <option value="revise" selected={@phase == "revise"}>revise</option>
-                    
+
                     <option value="final" selected={@phase == "final"}>final</option>
                   </select>
                 </div>
               </div>
-              
+
               <label class="block text-sm mt-3 mb-1 text-slate-300">prompt</label> <textarea
                 name="prompt"
                 rows="8"
@@ -285,39 +285,39 @@ defmodule AgentWebWeb.ChatExecuteLive do
                   else: if(@loading, do: "Executing…", else: "Execute")}
               </button>
             </form>
-            
+
             <%= if @error do %>
               <div class="mt-3 p-3 rounded border border-red-500/40 bg-red-950/30 text-sm">
                 <div class="font-semibold">Error</div>
-                 <pre class="mt-2 whitespace-pre-wrap"><%= inspect(@error, pretty: true) %></pre>
+                <pre class="mt-2 whitespace-pre-wrap"><%= inspect(@error, pretty: true) %></pre>
               </div>
             <% end %>
           </div>
           <!-- Right: conversation -->
           <div class="lg:col-span-3 border border-slate-700 rounded-lg p-4 bg-slate-800">
             <h2 class="text-lg font-semibold">Conversation</h2>
-            
+
             <div class="mt-3 space-y-3">
               <%= for m <- @messages do %>
                 <div class={bubble_class(m["role"])}>
                   <div class="text-xs text-slate-400 mb-1">{m["role"]}</div>
-                   <pre class="whitespace-pre-wrap"><%= m["content"] %></pre>
+                  <pre class="whitespace-pre-wrap"><%= m["content"] %></pre>
                 </div>
               <% end %>
-              
+
               <%= if @streaming do %>
                 <div class="p-3 rounded border bg-slate-950 border-indigo-500/40 text-sm">
                   <div class="text-xs text-slate-400 mb-1">assistant (streaming)</div>
-                   <pre class="whitespace-pre-wrap"><%= @stream_buffer %></pre>
+                  <pre class="whitespace-pre-wrap"><%= @stream_buffer %></pre>
                 </div>
               <% end %>
             </div>
-            
+
             <%= if @result do %>
               <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div class="p-3 rounded bg-slate-900 border border-slate-700">
                   <div class="text-slate-400">run_id</div>
-                  
+
                   <div class="font-mono break-all">
                     <%= if @result.run_id do %>
                       <a class="underline" href={~p"/api/runs/#{@result.run_id}"} target="_blank">
@@ -328,10 +328,10 @@ defmodule AgentWebWeb.ChatExecuteLive do
                     <% end %>
                   </div>
                 </div>
-                
+
                 <div class="p-3 rounded bg-slate-900 border border-slate-700">
                   <div class="text-slate-400">trace_id</div>
-                  
+
                   <div class="font-mono break-all">
                     <%= if @result.trace_id do %>
                       <a class="underline" href={~p"/runs?trace_id=#{@result.trace_id}"}>
@@ -342,24 +342,24 @@ defmodule AgentWebWeb.ChatExecuteLive do
                     <% end %>
                   </div>
                 </div>
-                
+
                 <div class="p-3 rounded bg-slate-900 border border-slate-700">
                   <div class="text-slate-400">status</div>
-                  
+
                   <div>{@result.status}</div>
                 </div>
-                
+
                 <div class="p-3 rounded bg-slate-900 border border-slate-700">
                   <div class="text-slate-400">latency</div>
-                  
+
                   <div>{@result.latency_ms} ms</div>
                 </div>
               </div>
-              
+
               <%= if @result.usage do %>
                 <div class="mt-4 p-3 rounded bg-slate-900 border border-slate-700 text-sm">
                   <div class="font-semibold">Usage</div>
-                   <pre class="mt-2 whitespace-pre-wrap"><%= inspect(@result.usage, pretty: true) %></pre>
+                  <pre class="mt-2 whitespace-pre-wrap"><%= inspect(@result.usage, pretty: true) %></pre>
                 </div>
               <% end %>
             <% end %>

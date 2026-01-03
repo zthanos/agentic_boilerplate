@@ -1,12 +1,12 @@
 defmodule AgentWebWeb.LlmProfilesController do
   use AgentWebWeb, :controller
 
-  alias AgentWeb.Llm.ProfileStoreEcto
+  alias AgentCore.Llm.Profiles
 
   # GET /api/llm/profiles?enabled=true
   def index(conn, params) do
     list_opts = build_list_opts(params)
-    profiles = ProfileStoreEcto.list(list_opts)
+    profiles = Profiles.list(list_opts)
 
     json(conn, %{
       data: Enum.map(profiles, &profile_to_map/1)

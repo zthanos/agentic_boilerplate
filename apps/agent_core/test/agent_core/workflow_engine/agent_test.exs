@@ -4,11 +4,12 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
 
   describe "agent creation and validation" do
     test "creates agent with valid configuration" do
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: [:test_workflow],
-        default_workflow: :test_workflow
-      })
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: [:test_workflow],
+          default_workflow: :test_workflow
+        })
 
       assert agent.id == "test_agent"
       assert agent.workflows == [:test_workflow]
@@ -22,11 +23,12 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
         result_formatter: :history_rag
       }
 
-      agent = Agent.new(%{
-        id: "llm_agent",
-        workflows: [:history_rag],
-        llm_integration: llm_config
-      })
+      agent =
+        Agent.new(%{
+          id: "llm_agent",
+          workflows: [:history_rag],
+          llm_integration: llm_config
+        })
 
       assert agent.llm_integration == llm_config
       assert Agent.get_info(agent).has_llm_integration == true
@@ -35,7 +37,7 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
     test "validates required fields" do
       # Missing workflows
       assert {:error, "At least one workflow is required"} =
-        Agent.validate(Agent.new(%{id: "test", workflows: []}))
+               Agent.validate(Agent.new(%{id: "test", workflows: []}))
 
       # Missing ID
       assert_raise KeyError, fn ->
@@ -44,10 +46,11 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
     end
 
     test "can check workflow execution capability" do
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: [:workflow1, :workflow2]
-      })
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: [:workflow1, :workflow2]
+        })
 
       assert Agent.can_execute_workflow?(agent, :workflow1) == true
       assert Agent.can_execute_workflow?(agent, :workflow2) == true
@@ -56,19 +59,22 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
 
     test "lists available workflows" do
       workflows = [:workflow1, :workflow2, :workflow3]
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: workflows
-      })
+
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: workflows
+        })
 
       assert Agent.list_workflows(agent) == workflows
     end
 
     test "adds routing rules" do
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: [:workflow1, :workflow2]
-      })
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: [:workflow1, :workflow2]
+        })
 
       rule = %{
         condition: fn req -> req.input[:type] == "history" end,
@@ -81,12 +87,13 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
     end
 
     test "gets agent info" do
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: [:workflow1, :workflow2],
-        default_workflow: :workflow1,
-        metadata: %{version: "1.0"}
-      })
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: [:workflow1, :workflow2],
+          default_workflow: :workflow1,
+          metadata: %{version: "1.0"}
+        })
 
       info = Agent.get_info(agent)
 
@@ -101,27 +108,29 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
 
   describe "LLM integration" do
     test "format_for_llm returns error when no LLM integration configured" do
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: [:test_workflow]
-      })
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: [:test_workflow]
+        })
 
       workflow_result = %{final_output: %{result: "test"}}
 
       assert {:error, "Agent does not have LLM integration configured"} =
-        Agent.format_for_llm(agent, workflow_result)
+               Agent.format_for_llm(agent, workflow_result)
     end
 
     test "create_llm_request returns error when no LLM integration configured" do
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: [:test_workflow]
-      })
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: [:test_workflow]
+        })
 
       workflow_result = %{final_output: %{result: "test"}}
 
       assert {:error, "Agent does not have LLM integration configured"} =
-        Agent.create_llm_request(agent, workflow_result, %{})
+               Agent.create_llm_request(agent, workflow_result, %{})
     end
 
     test "format_for_llm works with valid LLM configuration" do
@@ -131,11 +140,12 @@ defmodule AgentCore.WorkflowEngine.AgentTest do
         result_formatter: :generic
       }
 
-      agent = Agent.new(%{
-        id: "test_agent",
-        workflows: [:test_workflow],
-        llm_integration: llm_config
-      })
+      agent =
+        Agent.new(%{
+          id: "test_agent",
+          workflows: [:test_workflow],
+          llm_integration: llm_config
+        })
 
       workflow_result = %{final_output: %{message: "Hello", count: 5}}
 

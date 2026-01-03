@@ -39,8 +39,7 @@ defmodule AgentWebWeb.PlanExecuteController do
             exec_meta,
             on_chunk,
             plan_id: plan_id,
-            plan_version: plan_version,
-            memory_store: AgentWeb.Memory.Store
+            plan_version: plan_version
           )
         end)
       else

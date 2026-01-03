@@ -8,8 +8,8 @@ defmodule AgentCore.Llm.RunStore do
   @type error :: term()
   @type outcome :: map()
 
-  @type run_id :: Ecto.UUID.t()
-  @type trace_id :: Ecto.UUID.t()
+  @type run_id :: String.t()
+  @type trace_id :: String.t()
 
   @callback put(RunSnapshot.t()) :: {:ok, run_id()} | {:error, error()}
   @callback get(run_id()) :: {:ok, RunView.t()} | {:error, :not_found}

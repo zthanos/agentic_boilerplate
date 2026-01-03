@@ -33,6 +33,33 @@ defmodule AgentRuntime.Llm.HttpClient.FinchClient do
     end
   end
 
+  def get_json(url, headers, opts \\ []) do
+    receive_timeout = Keyword.get(opts, :receive_timeout, 60_000)
+    pool_timeout = Keyword.get(opts, :pool_timeout, 5_000)
+
+    req =
+      Finch.build(
+        :get,
+        url,
+        headers
+      )
+
+    case Finch.request(req, @finch,
+           receive_timeout: receive_timeout,
+           pool_timeout: pool_timeout
+         ) do
+      {:ok, %Finch.Response{status: status, body: resp_body}}
+      when status in 200..299 ->
+        {:ok, resp_body}
+
+      {:ok, %Finch.Response{status: status, body: resp_body}} ->
+        {:error, {:http_error, status, resp_body}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
+    end
+  end
+
   def http_post_stream(url, body, api_key, timeout_ms, on_chunk) do
     headers =
       [

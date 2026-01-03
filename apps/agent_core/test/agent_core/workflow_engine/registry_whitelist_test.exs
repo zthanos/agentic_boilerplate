@@ -13,8 +13,14 @@ defmodule AgentCore.WorkflowEngine.RegistryWhitelistTest do
         nodes: %{
           assess_need: %{step: AgentCore.WorkflowEngine.HistoryWorkflow.AssessNeedStep, opts: %{}},
           build_query: %{step: AgentCore.WorkflowEngine.HistoryWorkflow.BuildQueryStep, opts: %{}},
-          retrieve: %{step: AgentCore.WorkflowEngine.HistoryWorkflow.RetrieveCandidatesStep, opts: %{}},
-          rerank: %{step: AgentCore.WorkflowEngine.HistoryWorkflow.RerankCandidatesStep, opts: %{}},
+          retrieve: %{
+            step: AgentCore.WorkflowEngine.HistoryWorkflow.RetrieveCandidatesStep,
+            opts: %{}
+          },
+          rerank: %{
+            step: AgentCore.WorkflowEngine.HistoryWorkflow.RerankCandidatesStep,
+            opts: %{}
+          },
           compose: %{step: AgentCore.WorkflowEngine.HistoryWorkflow.ComposeContextStep, opts: %{}},
           done: %{step: AgentCore.WorkflowEngine.HistoryWorkflow.DoneStep, opts: %{}}
         },
@@ -52,7 +58,8 @@ defmodule AgentCore.WorkflowEngine.RegistryWhitelistTest do
         |> Enum.map(& &1.step)
         |> Enum.reject(&(&1 in whitelisted_modules))
 
-      assert Enum.empty?(step_modules), "All step modules should be whitelisted, but these are not: #{inspect(step_modules)}"
+      assert Enum.empty?(step_modules),
+             "All step modules should be whitelisted, but these are not: #{inspect(step_modules)}"
     end
 
     defp get_whitelisted_modules do

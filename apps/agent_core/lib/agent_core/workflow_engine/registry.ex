@@ -320,6 +320,14 @@ defmodule AgentCore.WorkflowEngine.Registry do
       AgentCore.WorkflowEngine.HistoryWorkflow.ComposeContextStep,
       AgentCore.WorkflowEngine.HistoryWorkflow.DoneStep,
 
+      # RAG conversation workflow steps
+      AgentCore.WorkflowEngine.RagConversationWorkflow.GenerateQueryStep,
+      AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep,
+      AgentCore.WorkflowEngine.RagConversationWorkflow.EnhancePromptStep,
+      AgentCore.WorkflowEngine.RagConversationWorkflow.AssessClarificationStep,
+      AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep,
+      AgentCore.WorkflowEngine.RagConversationWorkflow.CollectClarificationStep,
+
       # Test modules
       TestStep,
       MockStep,

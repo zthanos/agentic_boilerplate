@@ -187,3 +187,43 @@ case AgentStoreEcto.get(agent.id, agent.version) do
   {:ok, _} -> :ok
   {:error, :not_found} -> AgentStoreEcto.put(agent)
 end
+
+# Create a new workflow-based agent that uses the RAG conversation workflow
+workflow_agent =
+  AgentDef.new(%{
+    id: "rag_conversation_agent",
+    version: 1,
+    name: "RAG Conversation Agent",
+    description: "Agent using the new RAG conversation workflow for enhanced conversational AI",
+    # Workflow-based configuration
+    metadata: %{
+      "workflows" => ["rag_conversation"],
+      "created_by" => "seeds",
+      "created_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "purpose" => "rag_conversation_workflow"
+    },
+    profiles: %{
+      "execution_profile_id" => "req_llm",
+      "assessor_profile_id" => "req_llm",
+      "embeddings_profile_id" => "embeddings_nomic_v15"
+    },
+    prompts: %{
+      "system" =>
+        "You are an advanced conversational AI assistant powered by RAG (Retrieval-Augmented Generation). You use historical context to provide more accurate and contextually aware responses."
+    },
+    policies: %{
+      "rag_enabled" => true,
+      "max_tokens" => 2000,
+      "context_retrieval" => %{
+        "max_items" => 5,
+        "similarity_threshold" => 0.7
+      }
+    }
+  })
+
+{:ok, workflow_agent} = AgentDef.validate(workflow_agent)
+
+case AgentStoreEcto.get(workflow_agent.id, workflow_agent.version) do
+  {:ok, _} -> :ok
+  {:error, :not_found} -> AgentStoreEcto.put(workflow_agent)
+end

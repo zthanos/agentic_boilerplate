@@ -26,12 +26,12 @@ defmodule AgentWebWeb.ResultsComponent do
             </svg>
             Execution Results
           </h4>
-          
+
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="text-xs text-base-content/70 uppercase tracking-wider mb-2">Run ID</div>
-                
+
                 <div class="font-mono text-sm break-all flex items-center gap-2">
                   <a
                     class="link link-primary truncate"
@@ -43,13 +43,13 @@ defmodule AgentWebWeb.ResultsComponent do
                 </div>
               </div>
             </div>
-            
+
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="text-xs text-base-content/70 uppercase tracking-wider mb-2">
                   Conversation ID
                 </div>
-                
+
                 <a
                   class="font-mono text-sm break-all link link-primary"
                   href={~p"/conversations/#{@conversation_id}"}
@@ -58,21 +58,21 @@ defmodule AgentWebWeb.ResultsComponent do
                 </a>
               </div>
             </div>
-            
+
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="text-xs text-base-content/70 uppercase tracking-wider mb-2">Status</div>
-                
+
                 <div class="flex items-center gap-2">
                   <span class={status_badge_class(@result.status)}>{@result.status}</span>
                 </div>
               </div>
             </div>
-            
+
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="text-xs text-base-content/70 uppercase tracking-wider mb-2">Latency</div>
-                
+
                 <div class="flex items-center gap-2">
                   <span class="text-lg font-semibold">{@result.latency_ms}</span>
                   <span class="text-base-content/70">ms</span>
@@ -80,34 +80,34 @@ defmodule AgentWebWeb.ResultsComponent do
               </div>
             </div>
           </div>
-          
+
           <%= if @result.usage do %>
             <div class="card bg-base-100">
               <div class="card-body">
                 <h3 class="card-title text-sm">Usage Details</h3>
-                
+
                 <div class="stats stats-vertical lg:stats-horizontal shadow w-full">
                   <div class="stat">
                     <div class="stat-title">Prompt Tokens</div>
-                    
+
                     <div class="stat-value text-primary">
                       {Map.get(@result.usage || %{}, "prompt_tokens") ||
                         Map.get(@result.usage || %{}, :prompt_tokens) || 0}
                     </div>
                   </div>
-                  
+
                   <div class="stat">
                     <div class="stat-title">Completion Tokens</div>
-                    
+
                     <div class="stat-value text-secondary">
                       {Map.get(@result.usage || %{}, "completion_tokens") ||
                         Map.get(@result.usage || %{}, :completion_tokens) || 0}
                     </div>
                   </div>
-                  
+
                   <div class="stat">
                     <div class="stat-title">Total Tokens</div>
-                    
+
                     <div class="stat-value text-success">
                       {Map.get(@result.usage || %{}, "total_tokens") ||
                         Map.get(@result.usage || %{}, :total_tokens) || 0}

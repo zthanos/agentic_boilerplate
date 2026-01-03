@@ -172,11 +172,19 @@ After reviewing all identified properties, several can be consolidated to elimin
 *For any* history assessment input, the History_Graph workflow should properly evaluate need for history, generate appropriate queries when needed, handle empty results gracefully, and produce formatted context output with correct item counts
 **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6**
 
-**Property 10: Agent-based workflow execution**
+**Property 10: RAG-enhanced conversation workflow behavior**
+*For any* user message input, the RAG conversation workflow should generate appropriate LLM queries, retrieve relevant context from vector database, enhance prompts with retrieved context, assess clarification needs accurately, and route to appropriate response generation or clarification collection
+**Validates: Requirements 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7**
+
+**Property 11: Workflow infrastructure independence**
+*For any* workflow step implementation, it should use core infrastructure modules without depending on plan-specific implementations, maintain workflow-specific error handling, and preserve architectural separation between workflow and plan systems
+**Validates: Requirements 11.1, 11.2, 11.3, 11.4, 11.5**
+
+**Property 12: Agent-based workflow execution**
 *For any* agent with assigned workflows, the agent should properly expose workflows to UI controllers, manage workflow selection based on request parameters, and integrate seamlessly with LLM systems
 **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5**
 
-**Property 11: Clean architectural separation**
+**Property 13: Clean architectural separation**
 *For any* system interaction, UI controllers should interact only with agent interfaces, agents should manage workflow execution without exposing internal details, and LLM integration should be handled within workflow steps
 **Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.5**
 
@@ -231,7 +239,60 @@ The comprehensive History RAG Augmentation workflow implements intelligent promp
 5. **Context Composition**: Format selected candidates into coherent augmentation context
 6. **Completion**: Provide final augmented prompt and usage metadata
 
+## RAG-Enhanced Conversation Workflow Specification
+
+The RAG-Enhanced Conversation workflow implements the complete conversational AI flow that intelligently augments user prompts with relevant historical context and handles clarification assessment. This workflow represents the primary conversation processing pipeline that transforms user messages into contextually enhanced prompts ready for LLM processing.
+
+### Enhanced Conversation Process
+
+1. **LLM Query Generation**: Use LLM to analyze user message and generate structured queries for vector database search
+2. **Vector Database Retrieval**: Execute generated queries against conversation history to retrieve relevant context
+3. **Prompt Enhancement**: Augment original user prompt with retrieved historical context in structured format
+4. **Clarification Assessment**: Evaluate enhanced prompt to determine if user clarification is needed
+5. **Response Routing**: Route to either clarification collection or direct LLM response generation
+6. **Final Processing**: Generate final response using enhanced context or collect user clarification
+
 ### Workflow Definition
+
+### Workflow Definition
+```elixir
+%WorkflowEngine.Spec{
+  id: :rag_conversation,
+  version: 1,
+  entry: :generate_query,
+  exits: MapSet.new([:final_response, :collect_clarification]),
+  nodes: %{
+    generate_query: %{step: RagConversationWorkflow.GenerateQueryStep, opts: %{}},
+    retrieve_context: %{step: RagConversationWorkflow.RetrieveContextStep, opts: %{}},
+    enhance_prompt: %{step: RagConversationWorkflow.EnhancePromptStep, opts: %{}},
+    assess_clarification: %{step: RagConversationWorkflow.AssessClarificationStep, opts: %{}},
+    final_response: %{step: RagConversationWorkflow.FinalResponseStep, opts: %{}},
+    collect_clarification: %{step: RagConversationWorkflow.CollectClarificationStep, opts: %{}}
+  },
+  edges: [
+    %{from: :generate_query, to: :retrieve_context, when: {:artifact_present, :history_query}},
+    %{from: :generate_query, to: :enhance_prompt, when: {:decision, :skip_history, true}},
+    %{from: :retrieve_context, to: :enhance_prompt, when: {:artifact_present, :retrieved_context}},
+    %{from: :enhance_prompt, to: :assess_clarification, when: {:artifact_present, :enhanced_prompt}},
+    %{from: :assess_clarification, to: :final_response, when: {:decision, :needs_clarification, false}},
+    %{from: :assess_clarification, to: :collect_clarification, when: {:decision, :needs_clarification, true}}
+  ]
+}
+```
+
+### Input/Output Contract
+- **Input**: `%{user_message: String.t(), conversation_id: String.t() | nil, user_context: map()}`
+- **Output**: `%{enhanced_prompt: String.t(), needs_clarification: boolean(), clarification_questions: [String.t()] | nil, final_response: String.t() | nil}`
+
+### Enhanced Step Implementations
+The workflow implements six steps for complete RAG-enhanced conversation processing:
+
+1. **GenerateQueryStep**: Uses LLM to analyze user message and generate structured queries optimized for vector database retrieval of relevant historical context
+2. **RetrieveContextStep**: Executes generated queries against conversation history vector database, retrieving and scoring semantically similar content
+3. **EnhancePromptStep**: Augments original user prompt with retrieved historical context, formatting it in a structured way that preserves conversation flow
+4. **AssessClarificationStep**: Evaluates enhanced prompt using LLM to determine if additional user clarification is needed before generating response
+5. **FinalResponseStep**: Generates final LLM response using enhanced prompt when no clarification is needed
+6. **CollectClarificationStep**: Presents clarification questions to user when additional information is required before response generation
 
 ### Workflow Definition
 ```elixir

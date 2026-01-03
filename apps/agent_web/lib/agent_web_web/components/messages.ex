@@ -11,100 +11,100 @@ defmodule AgentWebWeb.MessagesComponent do
   def messages(assigns) do
     ~H"""
     <div
-      class="flex-1 overflow-y-auto max-h-[calc(100vh-320px)] scroll-smooth"
+      class="flex-1 overflow-y-auto max-h-[calc(100vh-320px)] scroll-smooth bg-base-100"
       phx-hook="AutoScroll"
       id="messages-container"
     >
-      <div class="p-5 space-y-6">
+      <div class="divide-y divide-base-300">
         <%= for m <- @messages do %>
-          <div id={"message-#{m["id"] || :rand.uniform(10000)}"} class={bubble_class(m["role"])}>
-            <!-- Message Header -->
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-3">
-                <div class={role_avatar_class(m["role"])}>
-                  <span class="text-base-100">
+          <div
+            id={"message-#{m["id"] || :rand.uniform(10000)}"}
+            class={["group px-6 py-8 transition-colors", bubble_class(m["role"])]}
+          >
+            <div class="max-w-4xl mx-auto">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div class={role_avatar_class(m["role"])}>
                     <%= if m["role"] == "user" do %>
-                      <.user_icon class="w-5 h-5" />
+                      <.user_icon class="w-4 h-4" />
                     <% else %>
-                      <.assistant_icon class="w-5 h-5" />
+                      <.assistant_icon class="w-4 h-4" />
                     <% end %>
-                  </span>
-                </div>
-                
-                <div>
-                  <span class="text-sm font-semibold capitalize">{role_display_name(m["role"])}</span>
-                  <div class="text-xs text-base-content/70 flex items-center gap-2">
-                    <.clock_icon class="w-3 h-3" /> <span>{m["timestamp"] || "Just now"}</span>
+                  </div>
+
+                  <div class="flex items-baseline gap-3">
+                    <span class="text-sm font-bold tracking-tight text-base-content capitalize">
+                      {role_display_name(m["role"])}
+                    </span>
+                    <span class="text-[11px] font-medium uppercase tracking-wider text-base-content/40 flex items-center gap-1.5">
+                      {m["timestamp"] || "Just now"}
+                    </span>
                   </div>
                 </div>
+
+                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    class="btn btn-xs btn-outline btn-ghost border-base-300 hover:bg-base-300"
+                    phx-click="copy_message"
+                    phx-value-content={m["content"]}
+                    title="Copy to clipboard"
+                  >
+                    <.copy_icon class="w-3.5 h-3.5 mr-1" />
+                    <span class="text-[10px] font-bold uppercase">Copy</span>
+                  </button>
+                </div>
               </div>
-              <!-- Message Actions -->
-              <div class="flex gap-1 opacity-0 hover:opacity-100 transition-opacity">
-                <button
-                  class="btn btn-xs btn-ghost btn-circle"
-                  phx-click="copy_message"
-                  phx-value-content={m["content"]}
-                  title="Copy to clipboard"
-                >
-                  <.copy_icon class="w-3.5 h-3.5" />
-                </button>
+
+              <div class="pl-11">
+                <div class="message-content">
+                  <%= if should_render_as_markdown?(m["content"]) do %>
+                    <div class="prose prose-sm md:prose-base max-w-none dark:prose-invert
+                                prose-headings:font-bold prose-headings:text-base-content
+                                prose-p:leading-relaxed prose-pre:bg-base-200 prose-pre:border
+                                prose-pre:border-base-300 prose-table:border prose-table:rounded-lg">
+                      {raw(render_markdown(m["content"]))}
+                    </div>
+                  <% else %>
+                    <div class="whitespace-pre-wrap text-base-content/90 font-sans leading-relaxed text-sm md:text-base">
+                      {m["content"]}
+                    </div>
+                  <% end %>
+                </div>
+
+                <%= if m["token_count"] do %>
+                  <div class="mt-4 flex items-center gap-2">
+                    <span class="text-[10px] font-mono text-base-content/40 uppercase tracking-widest">
+                      Usage: {m["token_count"]} tokens
+                    </span>
+                  </div>
+                <% end %>
               </div>
             </div>
-            <!-- Message Content with Markdown -->
-            <div class="message-content">
-              <%= if should_render_as_markdown?(m["content"]) do %>
-                <!-- Rendered Markdown -->
-                <div class="prose prose-lg max-w-none dark:prose-invert prose-headings:font-semibold prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:my-4 prose-pre:bg-base-300 prose-pre:p-4 prose-pre:rounded-box prose-pre:overflow-x-auto prose-code:before:content-none prose-code:after:content-none prose-code:bg-base-300 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-table:my-4 prose-th:bg-base-200 prose-th:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:text-primary/90 prose-strong:font-semibold">
-                  {raw(render_markdown(m["content"]))}
-                </div>
-              <% else %>
-                <!-- Plain Text -->
-                <div class="whitespace-pre-wrap text-base-content font-sans leading-relaxed">
-                  {m["content"]}
-                </div>
-              <% end %>
-            </div>
-            <!-- Optional: Token Count -->
-            <%= if m["token_count"] do %>
-              <div class="mt-2 text-xs text-base-content/50 flex justify-end">
-                <span class="badge badge-sm badge-outline">{m["token_count"]} tokens</span>
-              </div>
-            <% end %>
           </div>
         <% end %>
-        <!-- Streaming Message -->
+
         <%= if @streaming do %>
-          <div class="chat chat-start">
-            <div class="chat-image avatar">
-              <div class="w-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
-                <.assistant_icon class="w-5 h-5 text-base-100" />
-              </div>
-            </div>
-            
-            <div class="chat-header mb-2">
-              <span class="font-semibold">Assistant</span>
-              <time class="text-xs opacity-50 ml-2">Streaming...</time>
-            </div>
-            
-            <div class="chat-bubble chat-bubble-primary">
-              <!-- Streaming content with markdown -->
-              <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-base-300/50 prose-code:bg-base-300/50">
-                {raw(render_markdown(@stream_buffer))}
-              </div>
-              <!-- Typing indicator -->
-              <div class="flex space-x-1 mt-3">
-                <div class="w-2 h-2 bg-primary-content rounded-full animate-bounce"></div>
-                
-                <div
-                  class="w-2 h-2 bg-primary-content rounded-full animate-bounce"
-                  style="animation-delay: 0.2s"
-                >
+          <div class="px-6 py-8 bg-primary/5 border-l-4 border-primary">
+            <div class="max-w-4xl mx-auto">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-content">
+                  <.assistant_icon class="w-4 h-4" />
                 </div>
-                
-                <div
-                  class="w-2 h-2 bg-primary-content rounded-full animate-bounce"
-                  style="animation-delay: 0.4s"
-                >
+                <span class="text-sm font-bold text-primary italic animate-pulse">
+                  Assistant is thinking...
+                </span>
+              </div>
+
+              <div class="pl-11">
+                <div class="prose prose-sm max-w-none dark:prose-invert">
+                  {raw(render_markdown(@stream_buffer))}
+                </div>
+                <div class="flex space-x-1.5 mt-4">
+                  <div class="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce"></div>
+                  <div class="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:0.2s]">
+                  </div>
+                  <div class="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:0.4s]">
+                  </div>
                 </div>
               </div>
             </div>
@@ -117,24 +117,21 @@ defmodule AgentWebWeb.MessagesComponent do
 
   # Helper Functions
 
-  defp bubble_class("user"), do: "bg-base-200 border border-base-300 rounded-box p-5"
-
-  defp bubble_class("assistant"),
-    do:
-      "bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20 rounded-box p-5"
-
-  defp bubble_class(_), do: "bg-base-100 border border-base-300 rounded-box p-5"
+  # Standard white/dark background
+  defp bubble_class("user"), do: "bg-base-100"
+  # Subtle tint for assistant
+  defp bubble_class("assistant"), do: "bg-base-200/50 border-y border-base-200"
+  defp bubble_class(_), do: "bg-base-100"
 
   defp role_avatar_class("user"),
-    do:
-      "w-10 h-10 rounded-full bg-gradient-to-r from-accent to-info flex items-center justify-center text-base-100"
+    do: "w-8 h-8 rounded bg-base-300 flex items-center justify-center text-base-content"
 
   defp role_avatar_class("assistant"),
     do:
-      "w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center text-base-100"
+      "w-8 h-8 rounded bg-primary text-primary-content flex items-center justify-center shadow-sm"
 
   defp role_avatar_class(_),
-    do: "w-10 h-10 rounded-full bg-base-300 flex items-center justify-center text-base-content"
+    do: "w-8 h-8 rounded bg-base-200 flex items-center justify-center text-base-content"
 
   defp role_display_name("user"), do: "You"
   defp role_display_name("assistant"), do: "Assistant"

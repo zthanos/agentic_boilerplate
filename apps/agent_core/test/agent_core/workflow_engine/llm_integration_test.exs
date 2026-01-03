@@ -115,6 +115,7 @@ defmodule AgentCore.WorkflowEngine.LlmIntegrationTest do
 
     test "handles different context integration types" do
       workflow_result = %{final_output: %{result: "test"}}
+
       llm_config = %{
         provider: :openai,
         model: "gpt-4",
@@ -189,6 +190,7 @@ defmodule AgentCore.WorkflowEngine.LlmIntegrationTest do
       assert formatter_name in LlmIntegration.list_formatters()
 
       workflow_result = %{final_output: %{test: "value"}}
+
       llm_config = %{
         provider: :openai,
         model: "gpt-4",

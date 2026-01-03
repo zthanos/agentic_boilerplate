@@ -19,6 +19,42 @@ config :agent_runtime, AgentRuntime.Llm.ModelResolver,
   }
 
 # -----------------------------------------------------------------------------
+# Agent Runtime: Store behavior implementations (runtime configuration)
+# -----------------------------------------------------------------------------
+
+# Configure store implementations based on environment
+store_adapter = System.get_env("STORE_ADAPTER", "ecto")
+
+case store_adapter do
+  "ecto" ->
+    config :agent_runtime,
+      run_store_impl: AgentInfra.StoreEcto.RunStore,
+      profile_store_impl: AgentInfra.StoreEcto.ProfileStore,
+      provider_store_impl: AgentInfra.StoreEcto.ProviderStore,
+      workflow_store_impl: AgentInfra.StoreEcto.WorkflowStore,
+      conversation_store_impl: AgentInfra.StoreEcto.ConversationStore,
+      memory_chunk_store_impl: AgentInfra.StoreEcto.MemoryChunkStore
+
+  other ->
+    raise "Unsupported STORE_ADAPTER=#{inspect(other)}. Expected 'ecto'."
+end
+
+config :agent_runtime, AgentRuntime.Llm.ProfileSelector,
+  # If nil, resolver must decide (and should record resolution_source)
+  default: System.get_env("DEFAULT_LLM_PROFILE_ID"),
+  mappings: %{
+    # If nil, mapping should be treated as "no mapping"
+    requirements: System.get_env("REQ_LLM_PROFILE_ID")
+  }
+
+config :agent_runtime, AgentRuntime.Llm.ModelResolver,
+  openai_compatible: %{
+    # If nil, alias should be treated as "unknown alias"
+    local: System.get_env("LOCAL_LLM_MODEL"),
+    gpt4mini: System.get_env("GPT4MINI_MODEL")
+  }
+
+# -----------------------------------------------------------------------------
 # Enable Phoenix server in releases
 # -----------------------------------------------------------------------------
 if System.get_env("PHX_SERVER") do
@@ -26,7 +62,7 @@ if System.get_env("PHX_SERVER") do
 end
 
 # -----------------------------------------------------------------------------
-# Database config (all envs)
+# Database config (all envs) - Agent Infra Repository
 # -----------------------------------------------------------------------------
 db_adapter = System.get_env("DB_ADAPTER", "postgres")
 
@@ -36,23 +72,22 @@ case db_adapter do
       System.get_env("DATABASE_URL") ||
         raise """
         environment variable DATABASE_URL is missing.
-        Example: ecto://postgres:postgres@localhost:5432/agent_web_dev
+        Example: ecto://postgres:postgres@localhost:5432/agent_infra_dev
         """
 
-    config :agent_web, AgentWeb.Repo,
+    config :agent_infra, AgentInfra.Repo,
       url: database_url,
-      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-      types: AgentWeb.PostgrexTypes
+      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
 
   "sqlite" ->
     sqlite_path =
       System.get_env("SQLITE_PATH") ||
         raise """
         environment variable SQLITE_PATH is missing.
-        Example: /data/agent_web.sqlite3
+        Example: /data/agent_infra.sqlite3
         """
 
-    config :agent_web, AgentWeb.Repo,
+    config :agent_infra, AgentInfra.Repo,
       database: sqlite_path,
       pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
 
@@ -109,11 +144,11 @@ if config_env() == :prod do
     secret_key_base: secret_key_base
 end
 
-config :agent_runtime, :conversations_adapter, AgentWeb.Conversations.Adapter
+config :agent_runtime, :conversations_adapter, AgentInfra.StoreEcto.ConversationStore
 
-config :agent_runtime, :plan_store, AgentWeb.Llm.PlanStoreEcto
+config :agent_runtime, :plan_store, AgentInfra.StoreEcto.WorkflowStore
 
-config :agent_runtime, :agent_store, AgentWeb.Llm.AgentStoreEcto
+config :agent_runtime, :agent_store, AgentInfra.StoreEcto.AgentStore
 
 config :logger,
   handle_otp_reports: false,

@@ -5,8 +5,8 @@ defmodule AgentCore.Llm.RunSnapshots do
   @policy_version "merge_policy.v1"
 
   @type meta :: %{
-          optional(:trace_id) => Ecto.UUID.t() | String.t(),
-          optional(:parent_run_id) => Ecto.UUID.t() | String.t() | nil,
+          optional(:trace_id) => String.t(),
+          optional(:parent_run_id) => String.t() | nil,
           optional(:phase) => String.t() | nil
         }
 

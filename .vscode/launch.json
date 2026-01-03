@@ -8,8 +8,10 @@
             "task": "phx.server",
             "projectDir": "${workspaceRoot}/apps/agent_web",
             "env": {
-                "MIX_ENV": "dev"
-            }
+                "MIX_ENV": "dev",
+                "DATABASE_URL": "ecto://postgres:postgres@localhost:15432/agent_infra_dev"
+            },
+            "exitAfterTaskReturns": false,
         },
         {
             "type": "mix_task",

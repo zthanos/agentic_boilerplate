@@ -19,7 +19,7 @@ services:
       LANG: C.UTF-8
 
       DB_ADAPTER: "postgres"
-      DATABASE_URL: "ecto://postgres:postgres@agentic_boilerplate_db:5432/agent_web_dev"
+      DATABASE_URL: "ecto://postgres:postgres@agentic_boilerplate_db:5432/agent_infra_dev"
 
     depends_on:
       agentic_boilerplate_db:
@@ -40,8 +40,9 @@ services:
         mix deps.get
         mix deps.clean mime --build
         mix compile
-        cd apps/agent_web
-        mix setup
+        cd apps/agent_infra
+        mix ecto.setup
+        cd ../agent_web
         mix phx.server
       '
 
@@ -52,7 +53,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: agentic_boilerplate_postgres
     environment:
-      POSTGRES_DB: agent_web_dev
+      POSTGRES_DB: agent_infra_dev
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     # Αν θέλεις να συνδέεσαι από host, άλλαξε το αριστερό port (π.χ. 55432)
@@ -61,7 +62,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d agent_web_dev"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agent_infra_dev"]
       interval: 5s
       timeout: 5s
       retries: 20

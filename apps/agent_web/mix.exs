@@ -25,7 +25,7 @@ defmodule AgentWeb.MixProject do
   def application do
     [
       mod: {AgentWeb.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :agent_infra]
     ]
   end
 
@@ -44,13 +44,11 @@ defmodule AgentWeb.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:agent_infra, in_umbrella: true},
       {:agent_runtime, in_umbrella: true},
       {:phoenix, "~> 1.8.1"},
       {:phoenix_ecto, "~> 4.5"},
-      {:ecto_sql, "~> 3.13"},
-      {:postgrex, ">= 0.0.0"},
       {:phoenix_html, "~> 4.1"},
-      {:pgvector, "~> 0.3.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
       {:lazy_html, ">= 0.1.0", only: :test},

@@ -154,7 +154,8 @@ defmodule AgentCore.WorkflowEngine.Agent do
       iex> Agent.execute_workflow(agent, request)
       {:ok, %{status: :ok, result: %{...}, llm_formatted_result: %{...}, ...}}
   """
-  @spec execute_workflow(t(), workflow_request()) :: {:ok, workflow_response()} | {:error, String.t()}
+  @spec execute_workflow(t(), workflow_request()) ::
+          {:ok, workflow_response()} | {:error, String.t()}
   def execute_workflow(%__MODULE__{} = agent, request) when is_map(request) do
     start_time = System.monotonic_time(:millisecond)
 
@@ -301,7 +302,8 @@ defmodule AgentCore.WorkflowEngine.Agent do
   # Private Functions
 
   defp maybe_add_llm_integration(response, workflow_result, agent, request) do
-    should_integrate = Map.get(request, :llm_integration, false) and not is_nil(agent.llm_integration)
+    should_integrate =
+      Map.get(request, :llm_integration, false) and not is_nil(agent.llm_integration)
 
     if should_integrate do
       case format_for_llm(agent, workflow_result) do
@@ -318,8 +320,13 @@ defmodule AgentCore.WorkflowEngine.Agent do
   end
 
   defp validate_required_fields(%__MODULE__{id: nil}), do: {:error, "Agent ID is required"}
-  defp validate_required_fields(%__MODULE__{workflows: []}), do: {:error, "At least one workflow is required"}
-  defp validate_required_fields(%__MODULE__{workflows: workflows}) when not is_list(workflows), do: {:error, "Workflows must be a list"}
+
+  defp validate_required_fields(%__MODULE__{workflows: []}),
+    do: {:error, "At least one workflow is required"}
+
+  defp validate_required_fields(%__MODULE__{workflows: workflows}) when not is_list(workflows),
+    do: {:error, "Workflows must be a list"}
+
   defp validate_required_fields(_agent), do: :ok
 
   defp validate_workflows_exist(%__MODULE__{workflows: workflows}) do
@@ -396,7 +403,9 @@ defmodule AgentCore.WorkflowEngine.Agent do
   end
 
   defp validate_request_input(%{input: input}) when is_map(input), do: {:ok, input}
-  defp validate_request_input(_), do: {:error, "Request must contain 'input' field with map value"}
+
+  defp validate_request_input(_),
+    do: {:error, "Request must contain 'input' field with map value"}
 
   defp format_workflow_error(%{error: error}) when is_binary(error), do: error
   defp format_workflow_error(%{error: error}), do: inspect(error)

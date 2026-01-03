@@ -9,6 +9,7 @@ defmodule AgentCore.Llm.Agent.Definition do
   - policies (agent-level defaults/overrides)
   """
 
+  @derive Jason.Encoder
   @enforce_keys [:id, :version, :plan]
   defstruct [
     :id,
