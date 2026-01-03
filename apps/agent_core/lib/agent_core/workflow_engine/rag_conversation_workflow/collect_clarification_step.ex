@@ -125,14 +125,24 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.CollectClarificationS
 
   # Collect clarification and enhance prompt
   defp collect_clarification_and_enhance(
+         _clarification_questions,
+         _enhanced_prompt,
+         _user_message,
+         nil,
+         _overrides,
+         _opts
+       ) do
+    {:error, "no_profile"}
+  end
+
+  defp collect_clarification_and_enhance(
          clarification_questions,
          enhanced_prompt,
          user_message,
          profile,
          overrides,
          opts
-       )
-       when not is_nil(profile) do
+       ) do
     # Validate we have clarification questions
     if is_nil(clarification_questions) or clarification_questions == [] do
       {:error, "no_clarification_questions"}
@@ -153,17 +163,6 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.CollectClarificationS
         opts
       )
     end
-  end
-
-  defp collect_clarification_and_enhance(
-         _clarification_questions,
-         _enhanced_prompt,
-         _user_message,
-         _profile,
-         _overrides,
-         _opts
-       ) do
-    {:error, "no_profile"}
   end
 
   # Simulate clarification collection for workflow execution

@@ -8,10 +8,10 @@ defmodule AgentInfra.StoreEcto.RunStore do
   """
 
   @behaviour AgentCore.Stores.RunStore
-  @behaviour AgentCore.Llm.RunStore
+  # @behaviour AgentCore.Llm.RunStore
 
   alias AgentCore.{Runs, Stores.RunStore}
-  alias AgentCore.Llm.{RunSnapshot, RunView}
+  alias AgentCore.Llm.{RunSnapshot}
   alias AgentInfra.{Repo, Schema.Run}
   import Ecto.Query
 
@@ -212,7 +212,8 @@ defmodule AgentInfra.StoreEcto.RunStore do
       resolved_at: snapshot.resolved_at,
       overrides: snapshot.overrides || %{},
       invocation_config: snapshot.invocation_config || %{},
-      status: "created",  # New snapshots start as created
+      # New snapshots start as created
+      status: "created",
       started_at: nil,
       finished_at: nil,
       error: nil,

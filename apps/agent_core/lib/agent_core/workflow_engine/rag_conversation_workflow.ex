@@ -104,162 +104,170 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow do
   """
   @spec get_workflow_spec() :: Spec.t()
   def get_workflow_spec do
-    %Spec{
-      id: @workflow_id,
-      version: @workflow_version,
-      entry: :generate_query,
-      exits: MapSet.new([:final_response, :collect_clarification]),
-      nodes: %{
-        generate_query: %{
-          step: GenerateQueryStep,
-          opts: %{
-            system_prompt: get_query_generation_system_prompt(),
-            max_query_length: 200,
-            fallback_behavior: :skip_history
-          }
-        },
-        retrieve_context: %{
-          step: RetrieveContextStep,
-          opts: %{
-            limit: 10,
-            threshold: 0.7,
-            max_context_items: 5,
-            embeddings_profile_id: "embeddings_nomic_v15",
-            embeddings_profile_id_secondary: "embeddings_openai_v3"
-          }
-        },
-        enhance_prompt: %{
-          step: EnhancePromptStep,
-          opts: %{
-            max_context_items: 5,
-            min_context_score: 0.3,
-            max_content_length: 500,
-            include_context_scores: false,
-            context_header: "Relevant conversation history:",
-            context_separator: "\n---\n"
-          }
-        },
-        assess_clarification: %{
-          step: AssessClarificationStep,
-          opts: %{
-            system_prompt: get_clarification_assessment_system_prompt(),
-            assessment_temperature: 0.1,
-            max_questions: 3,
-            fallback_behavior: :no_clarification
-          }
-        },
-        final_response: %{
-          step: FinalResponseStep,
-          opts: %{
-            system_prompt: get_response_generation_system_prompt(),
-            temperature: 0.7,
-            max_tokens: 2000,
-            request_timeout_ms: 15_000,
-            max_retries: 2,
-            max_response_length: 4000
-          }
-        },
-        collect_clarification: %{
-          step: CollectClarificationStep,
-          opts: %{
-            regeneration_system_prompt: get_prompt_regeneration_system_prompt(),
-            regeneration_temperature: 0.3,
-            regeneration_max_tokens: 1500,
-            regeneration_timeout_ms: 10_000,
-            max_regenerated_prompt_length: 3000
-          }
-        }
-      },
-      edges: [
-        # From generate_query: route based on query generation success
-        %{
-          from: :generate_query,
-          to: :retrieve_context,
-          when: {:artifact_present, :history_query}
-        },
-        %{
-          from: :generate_query,
-          to: :enhance_prompt,
-          when: {:decision, :skip_history, true}
-        },
+    case Spec.new(
+           id: @workflow_id,
+           version: @workflow_version,
+           entry: :generate_query,
+           # Λίστα, όχι MapSet
+           exits: [:final_response, :collect_clarification],
+           nodes: %{
+             generate_query: %{
+               step: GenerateQueryStep,
+               opts: %{
+                 system_prompt: get_query_generation_system_prompt(),
+                 max_query_length: 200,
+                 fallback_behavior: :skip_history
+               }
+             },
+             retrieve_context: %{
+               step: RetrieveContextStep,
+               opts: %{
+                 limit: 10,
+                 threshold: 0.7,
+                 max_context_items: 5,
+                 embeddings_profile_id: "embeddings_nomic_v15",
+                 embeddings_profile_id_secondary: "embeddings_openai_v3"
+               }
+             },
+             enhance_prompt: %{
+               step: EnhancePromptStep,
+               opts: %{
+                 max_context_items: 5,
+                 min_context_score: 0.3,
+                 max_content_length: 500,
+                 include_context_scores: false,
+                 context_header: "Relevant conversation history:",
+                 context_separator: "\n---\n"
+               }
+             },
+             assess_clarification: %{
+               step: AssessClarificationStep,
+               opts: %{
+                 system_prompt: get_clarification_assessment_system_prompt(),
+                 assessment_temperature: 0.1,
+                 max_questions: 3,
+                 fallback_behavior: :no_clarification
+               }
+             },
+             final_response: %{
+               step: FinalResponseStep,
+               opts: %{
+                 system_prompt: get_response_generation_system_prompt(),
+                 temperature: 0.7,
+                 max_tokens: 2000,
+                 request_timeout_ms: 15_000,
+                 max_retries: 2,
+                 max_response_length: 4000
+               }
+             },
+             collect_clarification: %{
+               step: CollectClarificationStep,
+               opts: %{
+                 regeneration_system_prompt: get_prompt_regeneration_system_prompt(),
+                 regeneration_temperature: 0.3,
+                 regeneration_max_tokens: 1500,
+                 regeneration_timeout_ms: 10_000,
+                 max_regenerated_prompt_length: 3000
+               }
+             }
+           },
+           edges: [
+             # From generate_query: route based on query generation success
+             %{
+               from: :generate_query,
+               to: :retrieve_context,
+               when: {:artifact_present, :history_query}
+             },
+             %{
+               from: :generate_query,
+               to: :enhance_prompt,
+               when: {:decision, :skip_history, true}
+             },
+             # From retrieve_context: always proceed to enhance_prompt
+             %{
+               from: :retrieve_context,
+               to: :enhance_prompt,
+               when: {:artifact_present, :retrieved_context}
+             },
+             # From enhance_prompt: always proceed to clarification assessment
+             %{
+               from: :enhance_prompt,
+               to: :assess_clarification,
+               when: {:artifact_present, :enhanced_prompt}
+             },
+             # From assess_clarification: route based on clarification need
+             %{
+               from: :assess_clarification,
+               to: :final_response,
+               when: {:decision, :needs_clarification, false}
+             },
+             %{
+               from: :assess_clarification,
+               to: :collect_clarification,
+               when: {:decision, :needs_clarification, true}
+             }
+           ],
+           schema: %{
+             input: %{
+               type: :map,
+               required: [:user_message],
+               properties: %{
+                 user_message: %{type: :string, description: "The user's message to process"},
+                 conversation_id: %{
+                   type: :string,
+                   description: "Optional conversation identifier for history retrieval"
+                 },
+                 user_context: %{
+                   type: :map,
+                   description: "Additional context about the user/conversation"
+                 },
+                 profile: %{type: :map, description: "LLM profile for execution"},
+                 overrides: %{type: :map, description: "LLM overrides for execution"}
+               }
+             },
+             output: %{
+               type: :map,
+               required: [:enhanced_prompt],
+               properties: %{
+                 enhanced_prompt: %{
+                   type: :string,
+                   description: "The final enhanced prompt with context"
+                 },
+                 needs_clarification: %{
+                   type: :boolean,
+                   description: "Whether clarification was needed"
+                 },
+                 clarification_questions: %{
+                   type: :array,
+                   description: "Questions asked for clarification"
+                 },
+                 final_response: %{
+                   type: :string,
+                   description: "Generated response if no clarification needed"
+                 },
+                 clarification_responses: %{
+                   type: :array,
+                   description: "User responses to clarification questions"
+                 },
+                 history_items_used: %{
+                   type: :integer,
+                   description: "Number of historical context items used"
+                 },
+                 generation_metadata: %{
+                   type: :map,
+                   description: "Metadata about response generation"
+                 }
+               }
+             }
+           }
+         ) do
+      {:ok, spec} ->
+        spec
 
-        # From retrieve_context: always proceed to enhance_prompt
-        %{
-          from: :retrieve_context,
-          to: :enhance_prompt,
-          when: {:artifact_present, :retrieved_context}
-        },
-
-        # From enhance_prompt: always proceed to clarification assessment
-        %{
-          from: :enhance_prompt,
-          to: :assess_clarification,
-          when: {:artifact_present, :enhanced_prompt}
-        },
-
-        # From assess_clarification: route based on clarification need
-        %{
-          from: :assess_clarification,
-          to: :final_response,
-          when: {:decision, :needs_clarification, false}
-        },
-        %{
-          from: :assess_clarification,
-          to: :collect_clarification,
-          when: {:decision, :needs_clarification, true}
-        }
-      ],
-      schema: %{
-        input: %{
-          type: :map,
-          required: [:user_message],
-          properties: %{
-            user_message: %{type: :string, description: "The user's message to process"},
-            conversation_id: %{
-              type: :string,
-              description: "Optional conversation identifier for history retrieval"
-            },
-            user_context: %{
-              type: :map,
-              description: "Additional context about the user/conversation"
-            },
-            profile: %{type: :map, description: "LLM profile for execution"},
-            overrides: %{type: :map, description: "LLM overrides for execution"}
-          }
-        },
-        output: %{
-          type: :map,
-          required: [:enhanced_prompt],
-          properties: %{
-            enhanced_prompt: %{
-              type: :string,
-              description: "The final enhanced prompt with context"
-            },
-            needs_clarification: %{
-              type: :boolean,
-              description: "Whether clarification was needed"
-            },
-            clarification_questions: %{
-              type: :array,
-              description: "Questions asked for clarification"
-            },
-            final_response: %{
-              type: :string,
-              description: "Generated response if no clarification needed"
-            },
-            clarification_responses: %{
-              type: :array,
-              description: "User responses to clarification questions"
-            },
-            history_items_used: %{
-              type: :integer,
-              description: "Number of historical context items used"
-            },
-            generation_metadata: %{type: :map, description: "Metadata about response generation"}
-          }
-        }
-      }
-    }
+      {:error, errors} ->
+        Logger.error("Failed to create workflow spec: #{inspect(errors)}")
+        raise "Invalid workflow specification: #{inspect(errors)}"
+    end
   end
 
   @doc """

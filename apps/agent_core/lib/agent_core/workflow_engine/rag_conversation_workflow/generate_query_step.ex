@@ -65,6 +65,7 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.GenerateQueryStep do
       {:ok, updated_ctx, output}
     else
       Logger.info("[GenerateQueryStep] Generating history query")
+
       case generate_history_query(user_message, profile, overrides, opts) do
         {:ok, query} ->
           Logger.info("[GenerateQueryStep] Query generated successfully: #{inspect(query)}")
@@ -146,6 +147,7 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.GenerateQueryStep do
       # Check if AgentRuntime.Llm.Executor is available
       if Code.ensure_loaded?(AgentRuntime.Llm.Executor) do
         Logger.info("[GenerateQueryStep] AgentRuntime.Llm.Executor is available, calling it")
+
         case AgentRuntime.Llm.Executor.execute(profile, overrides, llm_input, exec_meta) do
           {:ok, %{response: response}} ->
             Logger.info("[GenerateQueryStep] LLM execution successful")
@@ -172,7 +174,10 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.GenerateQueryStep do
       end
     rescue
       exception ->
-        Logger.error("[GenerateQueryStep] Exception in generate_history_query: #{Exception.message(exception)}")
+        Logger.error(
+          "[GenerateQueryStep] Exception in generate_history_query: #{Exception.message(exception)}"
+        )
+
         Logger.error("[GenerateQueryStep] Stacktrace: #{inspect(__STACKTRACE__)}")
         {:error, "llm_execution_exception: #{Exception.message(exception)}"}
     end

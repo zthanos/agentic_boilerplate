@@ -232,7 +232,6 @@ defmodule AgentCore.TestAssessment.CLI do
       :not_elixir_project -> "Not an Elixir project"
       {:cannot_read_apps_directory, _} -> "Cannot read apps directory"
       {:invalid_project_structure, _} -> "Invalid project structure"
-      other -> inspect(other)
     end
   end
 

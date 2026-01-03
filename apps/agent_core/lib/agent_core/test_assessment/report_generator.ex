@@ -6,10 +6,7 @@ defmodule AgentCore.TestAssessment.ReportGenerator do
   alias AgentCore.TestAssessment.{
     AssessmentReport,
     ReportSummary,
-    TestCategory,
-    RedundancyFinding,
     CoverageGap,
-    ConfigIssue,
     Recommendation
   }
 

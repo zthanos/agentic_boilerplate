@@ -12,10 +12,6 @@ defmodule AgentCore.TestAssessment.RecommendationEngine do
     ParsedTest
   }
 
-  alias AgentCore.TestAssessment.RedundancyFinding
-  alias AgentCore.TestAssessment.CoverageGap
-  alias AgentCore.TestAssessment.ConfigIssue
-
   @doc """
   Generates improvement recommendations based on analysis results.
 

@@ -33,7 +33,9 @@ defmodule AgentWeb.AgentSeeder do
       test_agent = create_test_agent()
       rag_conversation_agent = create_rag_conversation_test_agent()
 
-      Logger.info("[AgentSeeder] Created agents: #{inspect([test_agent.id, rag_conversation_agent.id])}")
+      Logger.info(
+        "[AgentSeeder] Created agents: #{inspect([test_agent.id, rag_conversation_agent.id])}"
+      )
 
       case store_multiple_agents([test_agent, rag_conversation_agent]) do
         {:ok, stored_agents} ->

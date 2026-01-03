@@ -49,16 +49,19 @@ defmodule AgentRuntime.Llm.AgentExecutor do
         case status do
           :start ->
             on_chunk.("🔄 Starting: #{format_step_name(step_id)}")
+
           :complete ->
             duration = Map.get(metadata, :duration_ms, 0)
             on_chunk.("✅ Completed: #{format_step_name(step_id)} (#{duration}ms)")
+
           :error ->
             error = Map.get(metadata, :error, "Unknown error")
             on_chunk.("❌ Failed: #{format_step_name(step_id)} - #{error}")
         end
       end
 
-      workflow_input_with_callbacks = Map.put(workflow_input_with_streaming, :on_workflow_progress, workflow_progress_callback)
+      workflow_input_with_callbacks =
+        Map.put(workflow_input_with_streaming, :on_workflow_progress, workflow_progress_callback)
 
       start_time = System.monotonic_time(:millisecond)
       result = WorkflowRuntime.execute(workflow_spec, workflow_input_with_callbacks, %{})
@@ -73,9 +76,10 @@ defmodule AgentRuntime.Llm.AgentExecutor do
       case result do
         {:ok, workflow_result} ->
           # Extract the final response from workflow artifacts
-          final_response = get_in(workflow_result.final_output, [:final_response]) ||
-                          workflow_result.final_output[:final_response] ||
-                          "Response generated successfully"
+          final_response =
+            get_in(workflow_result.final_output, [:final_response]) ||
+              workflow_result.final_output[:final_response] ||
+              "Response generated successfully"
 
           # Create a mock response structure that matches expected format
           mock_response = %{
@@ -167,7 +171,8 @@ defmodule AgentRuntime.Llm.AgentExecutor do
     workflow_id = List.first(workflows)
 
     # Convert string workflow ID to atom for registry lookup
-    workflow_atom = if is_atom(workflow_id), do: workflow_id, else: String.to_existing_atom(workflow_id)
+    workflow_atom =
+      if is_atom(workflow_id), do: workflow_id, else: String.to_existing_atom(workflow_id)
 
     case Registry.get_workflow(workflow_atom) do
       {:ok, spec} -> {:ok, spec}

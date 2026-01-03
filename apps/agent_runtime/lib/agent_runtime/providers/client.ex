@@ -7,7 +7,7 @@ defmodule AgentRuntime.Providers.Client do
   """
 
   alias AgentCore.Providers.{Request, Response}
-  alias AgentRuntime.Providers.{OpenAICompatible, Registry}
+  alias AgentRuntime.Providers.{Registry}
 
   require Logger
 
@@ -75,7 +75,7 @@ defmodule AgentRuntime.Providers.Client do
   """
   @spec estimate_cost(Request.t(), provider_config()) :: {:ok, float()} | {:error, term()}
   def estimate_cost(%Request{} = request, config) do
-    with {:ok, provider_module} <- get_provider_module(request.provider) do
+    with {:ok, provider_module} <- get_provider_module(config.provider) do
       if function_exported?(provider_module, :estimate_cost, 2) do
         provider_module.estimate_cost(request, config)
       else
@@ -83,6 +83,7 @@ defmodule AgentRuntime.Providers.Client do
       end
     end
   end
+
 
   # Private helper functions
 

@@ -640,7 +640,7 @@ defmodule AgentCore.TestAssessment.PhoenixAnalysis do
     end
   end
 
-  defp extract_validation_name(pattern, match) do
+  defp extract_validation_name(_pattern, match) do
     # Extract validation name from regex match
     case match do
       [full_match | _] when is_binary(full_match) ->

@@ -7,7 +7,7 @@ defmodule AgentCore.Workflows do
   and specification management.
   """
 
-  alias AgentCore.Workflows.{Spec, Step, Context}
+  alias AgentCore.Workflows.{Spec, Context}
 
   @type workflow_id :: atom()
   @type node_id :: atom()

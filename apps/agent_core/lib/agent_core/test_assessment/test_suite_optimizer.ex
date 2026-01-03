@@ -264,7 +264,7 @@ defmodule AgentCore.TestAssessment.TestSuiteOptimizer do
     end
   end
 
-  defp remove_test_files_safely(file_paths, backup_dir) do
+  defp remove_test_files_safely(file_paths, _backup_dir) do
     results =
       Enum.map(file_paths, fn file_path ->
         with {:ok, _backup_path} <- create_backup(file_path),

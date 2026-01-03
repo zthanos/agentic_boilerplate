@@ -194,7 +194,7 @@ defmodule AgentWeb.UIConsistencyValidator do
 
     # Check for consistent color usage
     semantic_colors = ["primary", "secondary", "accent", "info", "success", "warning", "error"]
-    base_colors = ["base-100", "base-200", "base-300", "base-content"]
+    _base_colors = ["base-100", "base-200", "base-300", "base-content"]
 
     # Check if using semantic colors appropriately
     issues =
@@ -227,20 +227,20 @@ defmodule AgentWeb.UIConsistencyValidator do
   end
 
   defp check_component_reuse(violations, content, component_name) do
-    issues = []
-
     # Check for proper component reuse patterns (only for specific cases)
-    # Only suggest MessagesComponent reuse if there's clear message rendering without using it
-    if String.contains?(content, "message") &&
-         String.contains?(content, "role") &&
-         String.contains?(content, "content") &&
-         !Regex.match?(~r/messages/, content) &&
-         !Regex.match?(~r/MessagesComponent/, content) do
-      issues =
-        issues ++ ["#{component_name}: Consider reusing MessagesComponent for message display"]
-    end
+    # Only suggest MessagesComponent reuse if there's clear message rendering
+    suggestion =
+      if String.contains?(content, "message") &&
+           String.contains?(content, "role") &&
+           String.contains?(content, "content") &&
+           !Regex.match?(~r/messages/, content) &&
+           !Regex.match?(~r/MessagesComponent/, content) do
+        ["#{component_name}: Consider reusing MessagesComponent for message display"]
+      else
+        []
+      end
 
-    violations ++ issues
+    violations ++ suggestion
   end
 
   defp check_accessibility_standards(violations, content, component_name) do

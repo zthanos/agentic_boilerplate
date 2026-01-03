@@ -149,10 +149,10 @@ defmodule AgentCore.Profiles do
     config = resolve_config(profile)
 
     # Create a deterministic hash of the configuration
-    config
-    |> :erlang.term_to_binary()
-    |> :crypto.hash(:sha256)
-    |> Base.encode16(case: :lower)
+    binary = :erlang.term_to_binary(config)
+    hash = :crypto.hash(:sha256, binary)
+
+    Base.encode16(hash, case: :lower)
   end
 
   # Private helpers

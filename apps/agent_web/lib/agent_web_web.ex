@@ -90,6 +90,7 @@ defmodule AgentWebWeb do
       # Common modules used in templates
       alias Phoenix.LiveView.JS
       alias AgentWebWeb.Layouts
+      alias AgentWebWeb.AdminLayouts
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())

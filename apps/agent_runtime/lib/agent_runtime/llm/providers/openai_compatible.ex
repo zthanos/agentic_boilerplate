@@ -181,7 +181,7 @@ defmodule AgentRuntime.Llm.Providers.OpenAICompatible do
   # Stream support
   # -------------------------
   @impl false
-  def stream(%Request{} = req, on_chunk) when is_function(on_chunk, 1) do
+  def stream(%Request{} = _req, on_chunk) when is_function(on_chunk, 1) do
     # Streaming not implemented for the new behavior interface
     {:error, :streaming_not_supported}
   end

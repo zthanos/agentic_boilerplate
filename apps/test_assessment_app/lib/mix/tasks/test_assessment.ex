@@ -216,14 +216,27 @@ defmodule Mix.Tasks.TestAssessment do
 
   defp format_error(reason) do
     case reason do
-      :path_not_found -> "Path does not exist"
-      :not_directory -> "Path is not a directory"
-      :no_valid_apps_found -> "No valid Elixir apps found in umbrella structure"
-      :not_elixir_project -> "Not a valid Elixir project (no mix.exs found)"
-      {:cannot_read_apps_directory, reason} -> "Cannot read apps directory: #{inspect(reason)}"
-      {:invalid_project_structure, reason} -> "Invalid project structure: #{inspect(reason)}"
-      {:assessment_failed, error} -> "Assessment failed: #{inspect(error)}"
-      other -> inspect(other)
+      :path_not_found ->
+        "Path does not exist"
+
+      :not_directory ->
+        "Path is not a directory"
+
+      :no_valid_apps_found ->
+        "No valid Elixir apps found in umbrella structure"
+
+      :not_elixir_project ->
+        "Not a valid Elixir project (no mix.exs found)"
+
+      {:cannot_read_apps_directory, reason} ->
+        "Cannot read apps directory: #{inspect(reason)}"
+
+      {:invalid_project_structure, reason} ->
+        "Invalid project structure: #{inspect(reason)}"
+
+      {:assessment_failed, error} ->
+        "Assessment failed: #{inspect(error)}"
+        # other -> inspect(other)
     end
   end
 

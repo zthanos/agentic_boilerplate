@@ -100,9 +100,350 @@
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 /* Make LiveView wrapper divs transparent for layout */
-[data-phx-session], [data-phx-teleported-src] { display: contents }
+[data-phx-session],
+[data-phx-teleported-src] {
+  display: contents
+}
 
 /* This file is for your main application CSS */
+
+/* ============================================================================
+   ACCESSIBILITY STYLES
+   ============================================================================ */
+
+/* Skip Links */
+.skip-link {
+  @apply absolute -top-10 left-4 z-50 px-4 py-2 bg-primary text-primary-content rounded;
+  @apply transform -translate-y-full transition-transform;
+  @apply focus:translate-y-0 focus:top-4;
+}
+
+.skip-links {
+  @apply fixed top-0 left-0 z-50;
+}
+
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.not-sr-only {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Focus Indicators */
+*:focus {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-base-100;
+}
+
+/* Enhanced focus for interactive elements */
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[tabindex]:focus {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-base-100;
+}
+
+/* Focus within for containers */
+.focus-within\:ring:focus-within {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-base-100;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .contrast-more\:border {
+    @apply border border-base-content;
+  }
+
+  .contrast-more\:border-2 {
+    @apply border-2 border-base-content;
+  }
+
+  .contrast-more\:bg-white {
+    @apply bg-base-100;
+  }
+
+  .contrast-more\:text-gray-900 {
+    @apply text-base-content;
+  }
+
+  .contrast-more\:border-gray-900 {
+    @apply border-base-content;
+  }
+}
+
+/* High contrast class for manual toggle */
+.high-contrast {
+  --color-base-100: white;
+  --color-base-200: #f5f5f5;
+  --color-base-300: #e5e5e5;
+  --color-base-content: black;
+}
+
+.high-contrast .text-gray-400,
+.high-contrast .text-gray-500,
+.high-contrast .text-gray-600 {
+  @apply text-base-content;
+}
+
+.high-contrast .bg-gray-100,
+.high-contrast .bg-gray-200 {
+  @apply bg-base-100 border border-base-content;
+}
+
+.high-contrast .border-gray-200,
+.high-contrast .border-gray-300 {
+  @apply border-base-content;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reduced motion class for manual toggle */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Motion safe utilities */
+.motion-safe\:animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.motion-safe\:animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.motion-safe\:transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.motion-safe\:transition-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.motion-safe\:transition-transform {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .motion-safe\:animate-spin,
+  .motion-safe\:animate-pulse,
+  .motion-safe\:transition-all,
+  .motion-safe\:transition-colors,
+  .motion-safe\:transition-transform {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Keyboard Navigation Indicators */
+.keyboard-nav button:focus,
+.keyboard-nav a:focus,
+.keyboard-nav [tabindex]:focus {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-base-100;
+  @apply bg-primary/10;
+}
+
+/* Menu and Navigation Accessibility */
+[role="menu"] {
+  @apply focus:outline-none;
+}
+
+[role="menuitem"] {
+  @apply focus:bg-primary focus:text-primary-content;
+}
+
+[role="tab"][aria-selected="true"] {
+  @apply bg-primary text-primary-content;
+}
+
+[role="tab"]:focus {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-base-100;
+}
+
+/* Table Accessibility */
+[role="table"] th {
+  @apply font-semibold;
+}
+
+[role="table"] th[aria-sort] {
+  @apply cursor-pointer;
+}
+
+[role="table"] th[aria-sort]:hover {
+  @apply bg-base-300;
+}
+
+[role="table"] th[aria-sort="ascending"]::after {
+  content: " ↑";
+}
+
+[role="table"] th[aria-sort="descending"]::after {
+  content: " ↓";
+}
+
+/* Form Accessibility */
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  @apply border-error ring-1 ring-error;
+}
+
+.form-error {
+  @apply text-error text-sm mt-1;
+}
+
+/* Loading and Status Indicators */
+[role="status"] {
+  @apply flex items-center gap-2;
+}
+
+[aria-live] {
+  @apply sr-only;
+}
+
+[aria-live]:not(.sr-only) {
+  @apply not-sr-only;
+}
+
+/* Modal and Dialog Accessibility */
+[role="dialog"] {
+  @apply focus:outline-none;
+}
+
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/50 z-40;
+}
+
+/* Progress Bar Accessibility */
+[role="progressbar"] {
+  @apply relative overflow-hidden bg-base-300 rounded-full h-2;
+}
+
+[role="progressbar"]::after {
+  content: "";
+  @apply absolute top-0 left-0 h-full bg-primary rounded-full transition-all;
+  width: var(--progress-value, 0%);
+}
+
+/* Tooltip Accessibility */
+[role="tooltip"] {
+  @apply absolute z-50 px-2 py-1 text-sm bg-base-content text-base-100 rounded;
+  @apply pointer-events-none;
+}
+
+/* Alert and Notification Accessibility */
+[role="alert"] {
+  @apply p-4 rounded-lg border-l-4;
+}
+
+[role="alert"].alert-error {
+  @apply bg-error/10 border-error text-error;
+}
+
+[role="alert"].alert-warning {
+  @apply bg-warning/10 border-warning text-warning;
+}
+
+[role="alert"].alert-info {
+  @apply bg-info/10 border-info text-info;
+}
+
+[role="alert"].alert-success {
+  @apply bg-success/10 border-success text-success;
+}
+
+/* Breadcrumb Accessibility */
+[role="navigation"] ol,
+[role="navigation"] ul {
+  @apply flex items-center gap-2;
+}
+
+[role="navigation"] li:not(:last-child)::after {
+  content: "/";
+  @apply text-base-content/50 ml-2;
+}
+
+/* Search and Filter Accessibility */
+[role="searchbox"] {
+  @apply w-full px-3 py-2 border border-base-300 rounded-lg;
+  @apply focus:border-primary focus:ring-1 focus:ring-primary;
+}
+
+/* Data Table Accessibility */
+.data-table {
+  @apply w-full border-collapse;
+}
+
+.data-table th,
+.data-table td {
+  @apply px-4 py-2 text-left border-b border-base-300;
+}
+
+.data-table th {
+  @apply bg-base-200 font-semibold;
+}
+
+.data-table tbody tr:hover {
+  @apply bg-base-100;
+}
+
+/* Print Styles for Accessibility */
+@media print {
+
+  .skip-link,
+  .sr-only {
+    @apply hidden;
+  }
+
+  a::after {
+    content: " (" attr(href) ")";
+    @apply text-sm text-gray-600;
+  }
+
+  abbr[title]::after {
+    content: " (" attr(title) ")";
+  }
+}
 
 
 /* Custom markdown styling */
@@ -170,4 +511,782 @@
   content: counter(line);
   @apply text-base-content/30 mr-4 w-4 inline-block text-right;
   user-select: none;
+}
+
+/* ============================================================================
+   ADMIN DASHBOARD VISUAL POLISH & MICRO-INTERACTIONS
+   ============================================================================ */
+
+/* Enhanced Button Interactions */
+.btn {
+  @apply motion-safe:transition-all duration-200;
+  @apply transform motion-safe:hover:scale-105 motion-safe:active:scale-95;
+}
+
+.btn:hover {
+  @apply shadow-lg;
+}
+
+.btn-primary:hover {
+  @apply shadow-primary/25;
+}
+
+.btn-secondary:hover {
+  @apply shadow-secondary/25;
+}
+
+.btn-accent:hover {
+  @apply shadow-accent/25;
+}
+
+/* Card Hover Effects */
+.card {
+  @apply motion-safe:transition-all duration-300;
+}
+
+.card:hover {
+  @apply shadow-xl motion-safe:transform motion-safe:hover:-translate-y-1;
+}
+
+/* Enhanced Loading States */
+.loading-overlay {
+  @apply fixed inset-0 bg-base-100/80 backdrop-blur-sm z-50;
+  @apply flex items-center justify-center;
+}
+
+.loading-spinner {
+  @apply animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary;
+}
+
+.skeleton {
+  @apply animate-pulse bg-base-300 rounded;
+}
+
+.skeleton-text {
+  @apply h-4 bg-base-300 rounded animate-pulse;
+}
+
+.skeleton-avatar {
+  @apply h-10 w-10 bg-base-300 rounded-full animate-pulse;
+}
+
+/* Smooth Page Transitions */
+.page-transition-enter {
+  @apply opacity-0 transform translate-y-4;
+}
+
+.page-transition-enter-active {
+  @apply opacity-100 transform translate-y-0 motion-safe:transition-all duration-300;
+}
+
+.page-transition-exit {
+  @apply opacity-100 transform translate-y-0;
+}
+
+.page-transition-exit-active {
+  @apply opacity-0 transform -translate-y-4 motion-safe:transition-all duration-300;
+}
+
+/* Enhanced Form Interactions */
+.form-control input:focus,
+.form-control select:focus,
+.form-control textarea:focus {
+  @apply transform motion-safe:scale-105 shadow-lg;
+}
+
+.form-control label {
+  @apply motion-safe:transition-colors duration-200;
+}
+
+.form-control:focus-within label {
+  @apply text-primary;
+}
+
+/* Notification Animations */
+.notification-enter {
+  @apply opacity-0 transform translate-x-full;
+}
+
+.notification-enter-active {
+  @apply opacity-100 transform translate-x-0 motion-safe:transition-all duration-300;
+}
+
+.notification-exit {
+  @apply opacity-100 transform translate-x-0;
+}
+
+.notification-exit-active {
+  @apply opacity-0 transform translate-x-full motion-safe:transition-all duration-300;
+}
+
+/* Enhanced Sidebar Animations */
+.sidebar-item {
+  @apply motion-safe:transition-all duration-200;
+}
+
+.sidebar-item:hover {
+  @apply transform motion-safe:translate-x-1;
+}
+
+.sidebar-item.active {
+  @apply shadow-lg shadow-primary/20;
+}
+
+/* Table Row Animations */
+.table tbody tr {
+  @apply motion-safe:transition-all duration-200;
+}
+
+.table tbody tr:hover {
+  @apply transform motion-safe:scale-[1.02] shadow-md;
+}
+
+/* Badge Pulse Animation */
+.badge-pulse {
+  @apply animate-pulse;
+}
+
+.badge-glow {
+  @apply shadow-lg;
+}
+
+.badge-success.badge-glow {
+  @apply shadow-success/50;
+}
+
+.badge-error.badge-glow {
+  @apply shadow-error/50;
+}
+
+.badge-warning.badge-glow {
+  @apply shadow-warning/50;
+}
+
+.badge-info.badge-glow {
+  @apply shadow-info/50;
+}
+
+/* Enhanced Modal Animations */
+.modal-backdrop {
+  @apply motion-safe:transition-opacity duration-300;
+}
+
+.modal-backdrop.entering {
+  @apply opacity-0;
+}
+
+.modal-backdrop.entered {
+  @apply opacity-100;
+}
+
+.modal-content {
+  @apply motion-safe:transition-all duration-300;
+}
+
+.modal-content.entering {
+  @apply opacity-0 transform scale-95 translate-y-4;
+}
+
+.modal-content.entered {
+  @apply opacity-100 transform scale-100 translate-y-0;
+}
+
+/* Progress Bar Animations */
+.progress-bar {
+  @apply relative overflow-hidden bg-base-300 rounded-full h-2;
+}
+
+.progress-fill {
+  @apply absolute top-0 left-0 h-full bg-primary rounded-full;
+  @apply motion-safe:transition-all duration-500 ease-out;
+}
+
+.progress-fill.animated {
+  @apply animate-pulse;
+}
+
+/* Tooltip Animations */
+.tooltip {
+  @apply opacity-0 motion-safe:transition-all duration-200;
+  @apply transform scale-95;
+}
+
+.tooltip.show {
+  @apply opacity-100 transform scale-100;
+}
+
+/* Enhanced Focus States */
+.focus-ring {
+  @apply focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-base-100;
+  @apply motion-safe:transition-all duration-200;
+}
+
+/* Stagger Animation for Lists */
+.stagger-item {
+  @apply opacity-0 transform translate-y-4;
+}
+
+.stagger-item.animate {
+  @apply opacity-100 transform translate-y-0;
+  @apply motion-safe:transition-all duration-300;
+}
+
+.stagger-item:nth-child(1).animate {
+  transition-delay: 0ms;
+}
+
+.stagger-item:nth-child(2).animate {
+  transition-delay: 100ms;
+}
+
+.stagger-item:nth-child(3).animate {
+  transition-delay: 200ms;
+}
+
+.stagger-item:nth-child(4).animate {
+  transition-delay: 300ms;
+}
+
+.stagger-item:nth-child(5).animate {
+  transition-delay: 400ms;
+}
+
+/* Enhanced Dropdown Animations */
+.dropdown-content {
+  @apply opacity-0 transform scale-95 translate-y-2;
+  @apply motion-safe:transition-all duration-200;
+}
+
+.dropdown.dropdown-open .dropdown-content {
+  @apply opacity-100 transform scale-100 translate-y-0;
+}
+
+/* Floating Action Button */
+.fab {
+  @apply fixed bottom-6 right-6 z-40;
+  @apply btn btn-primary btn-circle btn-lg;
+  @apply shadow-xl motion-safe:transition-all duration-300;
+}
+
+.fab:hover {
+  @apply transform motion-safe:scale-110 shadow-2xl shadow-primary/30;
+}
+
+/* Enhanced Alert Animations */
+.alert {
+  @apply motion-safe:transition-all duration-300;
+}
+
+.alert.slide-in {
+  @apply transform translate-x-0;
+}
+
+.alert.slide-out {
+  @apply transform translate-x-full;
+}
+
+/* Pulse Animation for Status Indicators */
+.status-indicator {
+  @apply relative;
+}
+
+.status-indicator.online::before {
+  content: '';
+  @apply absolute -top-1 -right-1 w-3 h-3 bg-success rounded-full;
+  @apply animate-pulse;
+}
+
+.status-indicator.offline::before {
+  content: '';
+  @apply absolute -top-1 -right-1 w-3 h-3 bg-error rounded-full;
+}
+
+.status-indicator.busy::before {
+  content: '';
+  @apply absolute -top-1 -right-1 w-3 h-3 bg-warning rounded-full;
+  @apply animate-pulse;
+}
+
+/* Enhanced Search Input */
+.search-input {
+  @apply relative;
+}
+
+.search-input input {
+  @apply pl-10;
+}
+
+.search-input .search-icon {
+  @apply absolute left-3 top-1/2 transform -translate-y-1/2;
+  @apply text-base-content/50 motion-safe:transition-colors duration-200;
+}
+
+.search-input input:focus+.search-icon {
+  @apply text-primary;
+}
+
+/* Enhanced Tab Animations */
+.tab {
+  @apply motion-safe:transition-all duration-200;
+  @apply relative;
+}
+
+.tab::after {
+  content: '';
+  @apply absolute bottom-0 left-0 w-0 h-0.5 bg-primary;
+  @apply motion-safe:transition-all duration-300;
+}
+
+.tab.tab-active::after,
+.tab:hover::after {
+  @apply w-full;
+}
+
+/* Smooth Scroll Behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Enhanced Data Visualization */
+.chart-container {
+  @apply relative overflow-hidden rounded-lg;
+}
+
+.chart-bar {
+  @apply motion-safe:transition-all duration-500 ease-out;
+}
+
+.chart-bar:hover {
+  @apply opacity-80;
+}
+
+/* Loading Skeleton Variations */
+.skeleton-card {
+  @apply p-4 space-y-3;
+}
+
+.skeleton-line {
+  @apply h-4 bg-base-300 rounded animate-pulse;
+}
+
+.skeleton-line.short {
+  @apply w-3/4;
+}
+
+.skeleton-line.medium {
+  @apply w-1/2;
+}
+
+.skeleton-line.long {
+  @apply w-full;
+}
+
+/* Enhanced Error States */
+.error-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* Success Bounce Animation */
+.success-bounce {
+  animation: bounce 0.6s ease-in-out;
+}
+
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Gradient Backgrounds for Visual Interest */
+.gradient-primary {
+  background: linear-gradient(135deg, oklch(var(--color-primary)), oklch(var(--color-secondary)));
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, oklch(var(--color-accent)), oklch(var(--color-primary)));
+}
+
+.gradient-subtle {
+  background: linear-gradient(135deg, oklch(var(--color-base-100)), oklch(var(--color-base-200)));
+}
+
+/* Enhanced Dividers */
+.divider-gradient {
+  @apply relative;
+}
+
+.divider-gradient::before {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-r from-transparent via-base-content/20 to-transparent;
+}
+
+/* Floating Elements */
+.float-animation {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Enhanced Typography */
+.text-gradient {
+  background: linear-gradient(135deg, oklch(var(--color-primary)), oklch(var(--color-accent)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glassmorphism Effect */
+.glass {
+  @apply bg-base-100/80 backdrop-blur-md border border-base-content/10;
+}
+
+.glass-dark {
+  @apply bg-base-300/80 backdrop-blur-md border border-base-content/10;
+}
+
+/* Enhanced Shadows */
+.shadow-glow {
+  box-shadow: 0 0 20px oklch(var(--color-primary) / 0.3);
+}
+
+.shadow-soft {
+  box-shadow: 0 4px 20px oklch(var(--color-base-content) / 0.1);
+}
+
+/* Responsive Animations */
+@media (max-width: 768px) {
+  .mobile-no-animation * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Print Optimizations */
+@media print {
+  .no-print {
+    @apply hidden;
+  }
+
+  .print-break {
+    page-break-after: always;
+  }
+
+  .print-no-break {
+    page-break-inside: avoid;
+  }
+}
+
+/* ============================================================================
+   JAVASCRIPT INTERACTION ENHANCEMENTS
+   ============================================================================ */
+
+/* Paused animations for performance */
+.paused-animations *,
+.paused-animations *::before,
+.paused-animations *::after {
+  animation-play-state: paused !important;
+}
+
+/* Enhanced search input states */
+.search-input.focused {
+  @apply ring-2 ring-primary ring-offset-2;
+}
+
+.search-input.has-value .search-icon {
+  @apply text-primary;
+}
+
+/* Notification positioning */
+.notification {
+  @apply transform translate-x-full;
+}
+
+.notification.notification-enter-active {
+  @apply transform translate-x-0 motion-safe:transition-transform duration-300;
+}
+
+.notification.notification-exit-active {
+  @apply transform translate-x-full motion-safe:transition-transform duration-300;
+}
+
+/* Enhanced button states */
+.btn:active {
+  @apply transform scale-95;
+}
+
+.btn.loading {
+  @apply pointer-events-none opacity-75;
+}
+
+.btn.loading::after {
+  content: '';
+  @apply absolute inset-0 flex items-center justify-center;
+  @apply w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin;
+}
+
+/* Card interaction states */
+.card.interactive {
+  @apply cursor-pointer;
+}
+
+.card.interactive:hover {
+  @apply shadow-2xl;
+}
+
+.card.interactive:active {
+  @apply transform scale-98;
+}
+
+/* Table row interaction enhancements */
+.table tbody tr.interactive {
+  @apply cursor-pointer;
+}
+
+.table tbody tr.interactive:hover {
+  @apply bg-base-200/50;
+}
+
+.table tbody tr.interactive:active {
+  @apply bg-base-300/50;
+}
+
+/* Modal backdrop blur effect */
+.modal-backdrop.entered {
+  @apply backdrop-blur-sm;
+}
+
+/* Progress bar glow effect */
+.progress-fill.success {
+  @apply bg-success shadow-lg shadow-success/30;
+}
+
+.progress-fill.error {
+  @apply bg-error shadow-lg shadow-error/30;
+}
+
+.progress-fill.warning {
+  @apply bg-warning shadow-lg shadow-warning/30;
+}
+
+/* Enhanced focus states for keyboard navigation */
+.keyboard-focus *:focus {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-base-100;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  @apply motion-safe:transition-colors duration-200;
+}
+
+/* High contrast mode enhancements */
+.high-contrast .btn {
+  @apply border-2 border-base-content;
+}
+
+.high-contrast .card {
+  @apply border-2 border-base-content;
+}
+
+.high-contrast .badge {
+  @apply border border-base-content;
+}
+
+/* Reduced motion overrides */
+.reduce-motion .card:hover {
+  @apply transform-none shadow-lg;
+}
+
+.reduce-motion .btn:hover {
+  @apply transform-none;
+}
+
+.reduce-motion .stagger-item {
+  @apply opacity-100 transform-none;
+}
+
+/* Loading skeleton improvements */
+.skeleton-card {
+  @apply animate-pulse;
+}
+
+.skeleton-line {
+  @apply relative overflow-hidden;
+}
+
+.skeleton-line::after {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-r from-transparent via-base-100/50 to-transparent;
+  @apply transform -translate-x-full animate-pulse;
+}
+
+/* Status indicator improvements */
+.status-indicator.online::before {
+  box-shadow: 0 0 0 2px oklch(var(--color-base-100)), 0 0 0 4px oklch(var(--color-success));
+}
+
+.status-indicator.offline::before {
+  box-shadow: 0 0 0 2px oklch(var(--color-base-100)), 0 0 0 4px oklch(var(--color-error));
+}
+
+.status-indicator.busy::before {
+  box-shadow: 0 0 0 2px oklch(var(--color-base-100)), 0 0 0 4px oklch(var(--color-warning));
+}
+
+/* Enhanced tooltip positioning */
+.tooltip {
+  @apply pointer-events-none select-none;
+  @apply px-2 py-1 text-xs bg-base-content text-base-100 rounded;
+  @apply shadow-lg z-50;
+}
+
+.tooltip::after {
+  content: '';
+  @apply absolute top-full left-1/2 transform -translate-x-1/2;
+  @apply border-4 border-transparent border-t-base-content;
+}
+
+/* Improved form validation states */
+.form-control.error input,
+.form-control.error select,
+.form-control.error textarea {
+  @apply border-error ring-1 ring-error/20 bg-error/5;
+}
+
+.form-control.success input,
+.form-control.success select,
+.form-control.success textarea {
+  @apply border-success ring-1 ring-success/20 bg-success/5;
+}
+
+/* Enhanced data visualization */
+.chart-container:hover .chart-bar {
+  @apply opacity-60;
+}
+
+.chart-container:hover .chart-bar:hover {
+  @apply opacity-100 shadow-lg;
+}
+
+/* Improved accessibility for screen readers */
+.sr-only-focusable:focus {
+  @apply not-sr-only;
+  @apply absolute top-0 left-0 z-50;
+  @apply px-4 py-2 bg-primary text-primary-content;
+}
+
+/* Enhanced print styles */
+@media print {
+
+  .admin-sidebar,
+  .admin-navbar,
+  .btn,
+  .notification {
+    @apply hidden;
+  }
+
+  .admin-content {
+    @apply w-full max-w-none;
+  }
+
+  .card {
+    @apply shadow-none border border-gray-300;
+  }
+
+  /* Admin sidebar specific styles */
+  .admin-sidebar {
+    transition: all 0.3s ease;
+  }
+
+  .admin-sidebar.collapsed {
+    width: 5rem !important;
+    /* 80px */
+  }
+
+  .admin-sidebar:not(.collapsed) {
+    width: 16rem !important;
+    /* 256px */
+  }
+
+  /* Μεγάλα icons όταν sidebar είναι collapsed */
+  .admin-sidebar.collapsed .nav-icon {
+    width: 2rem !important;
+    height: 2rem !important;
+    font-size: 2rem !important;
+  }
+
+  /* Tooltip styling */
+  .admin-sidebar-tooltip {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 12px;
+    padding: 8px 12px;
+    background: #1f2937;
+    color: white;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    pointer-events: none;
+  }
+
+  .admin-sidebar-tooltip::before {
+    content: '';
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: transparent #1f2937 transparent transparent;
+  }
+
+  .admin-sidebar.collapsed .nav-link:hover .admin-sidebar-tooltip {
+    opacity: 1;
+    visibility: visible;
+  }
 }

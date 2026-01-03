@@ -196,8 +196,8 @@ defmodule AgentCore.WorkflowEngine.Agent do
           workflow_id: Map.get(request, :workflow_id),
           execution_time_ms: execution_time,
           metadata: %{
-            visited_nodes: workflow_result.visited_nodes || [],
-            trace_available: length(workflow_result.trace || []) > 0,
+            visited_nodes: Map.get(workflow_result, :visited_nodes, []),
+            trace_available: length(Map.get(workflow_result, :trace, [])) > 0,
             context_metadata: Map.get(request, :metadata, %{})
           }
         }
@@ -409,5 +409,5 @@ defmodule AgentCore.WorkflowEngine.Agent do
 
   defp format_workflow_error(%{error: error}) when is_binary(error), do: error
   defp format_workflow_error(%{error: error}), do: inspect(error)
-  defp format_workflow_error(_), do: "Workflow execution failed"
+  # defp format_workflow_error(_), do: "Workflow execution failed"
 end

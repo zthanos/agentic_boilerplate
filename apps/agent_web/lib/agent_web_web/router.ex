@@ -22,10 +22,25 @@ defmodule AgentWebWeb.Router do
     live "/runs", RunHistoryLive, :index
     live "/chat", ChatExecuteLive, :index
     live "/chat/:conversation_id", ChatExecuteLive, :index
-    live "/chat/:conversation_id/plan", PlanExecuteLive, :index
+    # live "/chat/:conversation_id/plan", PlanExecuteLive, :index
     live "/conversations", ChatExecuteLive, :index
     live "/conversations/:conversation_id", ChatExecuteLive, :index
     live "/agent-testing", AgentTestingLive, :index
+  end
+
+  # Admin Dashboard Routes
+  scope "/admin", AgentWebWeb do
+    pipe_through :browser
+
+    live "/", AdminLive, :index
+    live "/dashboard", AdminLive, :index
+    live "/runs", AdminRunHistoryLive, :index
+    live "/chat", AdminChatLive, :index
+    live "/settings", AdminSettingsLive, :index
+    live "/profiles", AdminProfilesLive, :index
+    live "/agents", AdminAgentsLive, :index
+    live "/workflows", AdminWorkflowsLive, :index
+    live "/testing", AdminTestingLive, :index
   end
 
   pipeline :sse do

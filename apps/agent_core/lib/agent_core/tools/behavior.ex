@@ -176,7 +176,7 @@ defmodule AgentCore.Tools.Behavior do
       {:ok, _} = success ->
         success
 
-      {:error, reason} when attempt < max_retries ->
+      {:error, _reason} when attempt < max_retries ->
         # Add exponential backoff
         :timer.sleep(round(:math.pow(2, attempt) * 1000))
         execute_with_retry_impl(tool_module, input, context, max_retries, attempt + 1)

@@ -607,7 +607,7 @@ defmodule AgentWebWeb.AgentTestingLive do
                                 <% else %>
                                   <span class="text-error">✗</span>
                                 <% end %>
-                                 <span class="font-medium text-sm">{result.test_name}</span>
+                                <span class="font-medium text-sm">{result.test_name}</span>
                                 <span class="text-xs text-base-content/50">
                                   ({result.execution_time_ms}ms)
                                 </span>
@@ -662,16 +662,16 @@ defmodule AgentWebWeb.AgentTestingLive do
                               <%= case @execution_status.status do %>
                                 <% :running -> %>
                                   <div class="loading loading-spinner loading-xs text-warning"></div>
-                                   <span class="text-warning font-medium">Executing</span>
+                                  <span class="text-warning font-medium">Executing</span>
                                 <% :completed -> %>
                                   <div class="text-success">✓</div>
-                                   <span class="text-success font-medium">Completed</span>
+                                  <span class="text-success font-medium">Completed</span>
                                 <% :failed -> %>
                                   <div class="text-error">✗</div>
-                                   <span class="text-error font-medium">Failed</span>
+                                  <span class="text-error font-medium">Failed</span>
                                 <% _ -> %>
                                   <div class="loading loading-spinner loading-xs"></div>
-                                   <span class="font-medium">Processing</span>
+                                  <span class="font-medium">Processing</span>
                               <% end %>
 
                               <%= if @execution_status.current_step_name do %>
@@ -722,7 +722,7 @@ defmodule AgentWebWeb.AgentTestingLive do
                         <div class="border-t border-base-300 px-4 py-1 bg-info/10">
                           <div class="flex items-center gap-2 text-xs text-info">
                             <div class="w-2 h-2 bg-info rounded-full animate-pulse"></div>
-                             <span>Connected to agent stream</span>
+                            <span>Connected to agent stream</span>
                           </div>
                         </div>
                       <% end %>
@@ -840,9 +840,9 @@ defmodule AgentWebWeb.AgentTestingLive do
     end
   end
 
-  defp format_user_error(err) do
-    ErrorHandler.format_user_error(err)
-  end
+  # defp format_user_error(err) do
+  #   ErrorHandler.format_user_error(err)
+  # end
 
   defp is_recoverable_error(err) do
     case err do
@@ -866,17 +866,17 @@ defmodule AgentWebWeb.AgentTestingLive do
     |> Enum.take(-3)
   end
 
-  defp build_conversation_history(existing_messages, new_message, _context) do
-    # Convert existing messages to the format expected by the agent
-    history_messages =
-      existing_messages
-      |> Enum.map(fn msg ->
-        %{"role" => msg["role"], "content" => msg["content"]}
-      end)
+  # defp build_conversation_history(existing_messages, new_message, _context) do
+  #   # Convert existing messages to the format expected by the agent
+  #   history_messages =
+  #     existing_messages
+  #     |> Enum.map(fn msg ->
+  #       %{"role" => msg["role"], "content" => msg["content"]}
+  #     end)
 
-    # Add the new user message
-    history_messages ++ [%{"role" => "user", "content" => new_message}]
-  end
+  #   # Add the new user message
+  #   history_messages ++ [%{"role" => "user", "content" => new_message}]
+  # end
 
   defp update_execution_status(socket, status, step_name \\ nil) do
     current_status = socket.assigns.execution_status
@@ -1128,7 +1128,10 @@ defmodule AgentWebWeb.AgentTestingLive do
 
         case load_workflow_graph(agent) do
           {:ok, workflow_graph} ->
-            Logger.info("[AgentTestingLive] Workflow loaded successfully: #{inspect(workflow_graph.id)}")
+            Logger.info(
+              "[AgentTestingLive] Workflow loaded successfully: #{inspect(workflow_graph.id)}"
+            )
+
             socket
             |> assign(:workflow_graph, workflow_graph)
             |> assign(:loading, false)
@@ -1281,6 +1284,7 @@ defmodule AgentWebWeb.AgentTestingLive do
       {:ok, spec} ->
         Logger.info("[AgentTestingLive] Workflow found: #{inspect(spec.id)}")
         {:ok, spec}
+
       {:error, reason} ->
         Logger.error("[AgentTestingLive] Workflow not found: #{inspect(reason)}")
         {:error, "workflow_not_found"}
@@ -1302,7 +1306,8 @@ defmodule AgentWebWeb.AgentTestingLive do
     [workflow_id | _] = Map.get(agent, :workflows)
 
     # Convert string workflow ID to atom for registry lookup
-    workflow_atom = if is_atom(workflow_id), do: workflow_id, else: String.to_existing_atom(workflow_id)
+    workflow_atom =
+      if is_atom(workflow_id), do: workflow_id, else: String.to_existing_atom(workflow_id)
 
     case AgentCore.WorkflowEngine.Registry.get_workflow(workflow_atom) do
       {:ok, spec} -> {:ok, spec}

@@ -209,7 +209,11 @@ defmodule AgentCore.WorkflowEngine.Compiler do
   end
 
   defp calculate_max_depth(entry, edges, exits, depth \\ 0, visited \\ MapSet.new()) do
-    if MapSet.member?(exits, entry) or MapSet.member?(visited, entry) do
+    # Convert to list για να αποφύγουμε το opaque type issue
+    exits_list = MapSet.to_list(exits)
+    visited_list = MapSet.to_list(visited)
+
+    if Enum.member?(exits_list, entry) or Enum.member?(visited_list, entry) do
       depth
     else
       new_visited = MapSet.put(visited, entry)
@@ -420,13 +424,17 @@ defmodule AgentCore.WorkflowEngine.Compiler do
   end
 
   defp detect_cycle(current, edges, visited, path) do
-    if current in path do
-      Enum.drop_while(path, &(&1 != current)) ++ [current]
-    else
-      if MapSet.member?(visited, current) do
+    cond do
+      # Check αν το current είναι ήδη στο path (κύκλος)
+      Enum.member?(path, current) ->
+        Enum.drop_while(path, &(&1 != current)) ++ [current]
+
+      # Check αν το current έχει ήδη επισκεφτεί
+      Enum.member?(visited, current) ->
         nil
-      else
-        new_visited = MapSet.put(visited, current)
+
+      true ->
+        new_visited = [current | visited]
         new_path = [current | path]
 
         next_nodes =
@@ -437,7 +445,6 @@ defmodule AgentCore.WorkflowEngine.Compiler do
         Enum.find_value(next_nodes, fn next_node ->
           detect_cycle(next_node, edges, new_visited, new_path)
         end)
-      end
     end
   end
 

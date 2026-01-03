@@ -66,17 +66,33 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
       embedding_profile_id = determine_embedding_profile_from_opts(opts)
       overrides = Map.get(input, :overrides, %{})
 
-      Logger.debug("[RetrieveContextStep] Starting retrieval with query: #{inspect(history_query)}")
-      Logger.debug("[RetrieveContextStep] Embedding profile: #{inspect(embedding_profile_id)}, Overrides: #{inspect(overrides)}")
+      Logger.debug(
+        "[RetrieveContextStep] Starting retrieval with query: #{inspect(history_query)}"
+      )
+
+      Logger.debug(
+        "[RetrieveContextStep] Embedding profile: #{inspect(embedding_profile_id)}, Overrides: #{inspect(overrides)}"
+      )
+
       Logger.debug("[RetrieveContextStep] Input keys: #{inspect(Map.keys(input))}")
       Logger.debug("[RetrieveContextStep] Input.profile: #{inspect(Map.get(input, :profile))}")
 
       # Check if vector database infrastructure is available
       if vector_db_available?() do
-        case retrieve_conversation_context(history_query, conversation_id, embedding_profile_id, overrides, opts) do
+        case retrieve_conversation_context(
+               history_query,
+               conversation_id,
+               embedding_profile_id,
+               overrides,
+               opts
+             ) do
           {:ok, context_items} ->
             updated_ctx =
-              AgentCore.WorkflowEngine.Context.put_artifact(ctx, :retrieved_context, context_items)
+              AgentCore.WorkflowEngine.Context.put_artifact(
+                ctx,
+                :retrieved_context,
+                context_items
+              )
 
             output = %{
               retrieved_count: length(context_items),
@@ -85,14 +101,18 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
               top_score: get_top_score(context_items)
             }
 
-            Logger.debug("[RetrieveContextStep] Successfully retrieved #{length(context_items)} context items")
+            Logger.debug(
+              "[RetrieveContextStep] Successfully retrieved #{length(context_items)} context items"
+            )
+
             {:ok, updated_ctx, output}
 
           {:error, reason} ->
             Logger.warning("[RetrieveContextStep] retrieve_context failed: #{inspect(reason)}")
 
             # Set empty context on error and continue
-            updated_ctx = AgentCore.WorkflowEngine.Context.put_artifact(ctx, :retrieved_context, [])
+            updated_ctx =
+              AgentCore.WorkflowEngine.Context.put_artifact(ctx, :retrieved_context, [])
 
             output = %{
               retrieved_count: 0,
@@ -105,7 +125,9 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
         end
       else
         # Vector database not available, skip retrieval but continue workflow
-        Logger.info("[RetrieveContextStep] Vector database infrastructure not available, skipping retrieval")
+        Logger.info(
+          "[RetrieveContextStep] Vector database infrastructure not available, skipping retrieval"
+        )
 
         updated_ctx = AgentCore.WorkflowEngine.Context.put_artifact(ctx, :retrieved_context, [])
 
@@ -122,32 +144,53 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
   end
 
   # Retrieve conversation context using vector database search
-  defp retrieve_conversation_context(query, conversation_id, embedding_profile_id, overrides, opts) do
-    Logger.debug("[RetrieveContextStep] Generating embedding for query: #{String.slice(query, 0, 100)}...")
+  defp retrieve_conversation_context(
+         query,
+         conversation_id,
+         embedding_profile_id,
+         overrides,
+         opts
+       ) do
+    Logger.debug(
+      "[RetrieveContextStep] Generating embedding for query: #{String.slice(query, 0, 100)}..."
+    )
 
     case generate_query_embedding(query, embedding_profile_id, overrides) do
       {:ok, query_embedding} ->
-        Logger.debug("[RetrieveContextStep] Successfully generated embedding with profile #{embedding_profile_id}, searching vector database...")
+        Logger.debug(
+          "[RetrieveContextStep] Successfully generated embedding with profile #{embedding_profile_id}, searching vector database..."
+        )
 
         case search_vector_database(query_embedding, conversation_id, opts) do
           {:ok, memory_chunks} ->
             # Convert memory chunks to context items
             context_items = convert_chunks_to_context(memory_chunks)
-            Logger.debug("[RetrieveContextStep] Successfully converted #{length(memory_chunks)} chunks to context items")
+
+            Logger.debug(
+              "[RetrieveContextStep] Successfully converted #{length(memory_chunks)} chunks to context items"
+            )
+
             {:ok, context_items}
 
           {:error, reason} ->
-            Logger.warning("[RetrieveContextStep] Vector database search failed: #{inspect(reason)}")
+            Logger.warning(
+              "[RetrieveContextStep] Vector database search failed: #{inspect(reason)}"
+            )
+
             {:error, reason}
         end
 
       {:error, reason} ->
-        Logger.warning("[RetrieveContextStep] Embedding generation failed with profile #{embedding_profile_id}: #{inspect(reason)}")
+        Logger.warning(
+          "[RetrieveContextStep] Embedding generation failed with profile #{embedding_profile_id}: #{inspect(reason)}"
+        )
 
         # Try fallback to secondary profile if primary failed
         case try_fallback_embedding_profile(query, embedding_profile_id, overrides, opts) do
           {:ok, query_embedding, fallback_profile} ->
-            Logger.info("[RetrieveContextStep] Successfully generated embedding with fallback profile #{fallback_profile}")
+            Logger.info(
+              "[RetrieveContextStep] Successfully generated embedding with fallback profile #{fallback_profile}"
+            )
 
             case search_vector_database(query_embedding, conversation_id, opts) do
               {:ok, memory_chunks} ->
@@ -155,19 +198,27 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
                 {:ok, context_items}
 
               {:error, search_reason} ->
-                Logger.warning("[RetrieveContextStep] Vector database search failed with fallback profile: #{inspect(search_reason)}")
+                Logger.warning(
+                  "[RetrieveContextStep] Vector database search failed with fallback profile: #{inspect(search_reason)}"
+                )
+
                 {:error, search_reason}
             end
 
           {:error, fallback_reason} ->
-            Logger.error("[RetrieveContextStep] Both primary and fallback embedding profiles failed: #{inspect(fallback_reason)}")
-            {:error, {:all_embedding_profiles_failed, %{primary: reason, fallback: fallback_reason}}}
+            Logger.error(
+              "[RetrieveContextStep] Both primary and fallback embedding profiles failed: #{inspect(fallback_reason)}"
+            )
+
+            {:error,
+             {:all_embedding_profiles_failed, %{primary: reason, fallback: fallback_reason}}}
         end
     end
   end
 
   # Generate embedding for the query text
-  defp generate_query_embedding(query, embedding_profile_id, overrides) when is_binary(embedding_profile_id) do
+  defp generate_query_embedding(query, embedding_profile_id, overrides)
+       when is_binary(embedding_profile_id) do
     # Build execution metadata
     exec_meta = %{
       "phase" => "retrieve_context_embedding"
@@ -179,10 +230,14 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
     # For embedding operations, we should use minimal overrides to avoid conflicts
     # Only include known safe override keys for embedding operations
     safe_override_keys = [
-      "temperature", :temperature,
-      "max_tokens", :max_tokens,
-      "timeout", :timeout,
-      "seed", :seed
+      "temperature",
+      :temperature,
+      "max_tokens",
+      :max_tokens,
+      "timeout",
+      :timeout,
+      "seed",
+      :seed
     ]
 
     # Filter out any keys that might conflict with embedding operations
@@ -199,7 +254,10 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
       end)
       |> Map.new()
 
-    Logger.debug("[RetrieveContextStep] Using clean overrides for embedding: #{inspect(clean_overrides)}")
+    Logger.debug(
+      "[RetrieveContextStep] Using clean overrides for embedding: #{inspect(clean_overrides)}"
+    )
+
     Logger.debug("[RetrieveContextStep] Original overrides: #{inspect(overrides)}")
     Logger.debug("[RetrieveContextStep] Embed profile: #{inspect(embed_profile)}")
 
@@ -207,11 +265,11 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
     try do
       # Use the keyword API which handles profile resolution internally
       case AgentRuntime.Llm.Executor.embed(
-        profile_id: embedding_profile_id,
-        input: query,
-        overrides: clean_overrides,
-        exec_meta: exec_meta
-      ) do
+             profile_id: embedding_profile_id,
+             input: query,
+             overrides: clean_overrides,
+             exec_meta: exec_meta
+           ) do
         {:ok, embedding} ->
           # The keyword API returns the embedding directly
           {:ok, embedding}
@@ -219,23 +277,33 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
         {:error, reason} ->
           # Check if the error is due to profile not found and try fallback
           error_string = inspect(reason)
+
           if String.contains?(error_string, "LLMProfile not found") do
-            Logger.warning("[RetrieveContextStep] Embedding profile #{embedding_profile_id} not found, falling back to req_llm")
+            Logger.warning(
+              "[RetrieveContextStep] Embedding profile #{embedding_profile_id} not found, falling back to req_llm"
+            )
+
             # Fall back to the main profile (req_llm) for embedding
             fallback_profile_id = "req_llm"
 
             case AgentRuntime.Llm.Executor.embed(
-              profile_id: fallback_profile_id,
-              input: query,
-              overrides: clean_overrides,
-              exec_meta: exec_meta
-            ) do
+                   profile_id: fallback_profile_id,
+                   input: query,
+                   overrides: clean_overrides,
+                   exec_meta: exec_meta
+                 ) do
               {:ok, embedding} ->
-                Logger.info("[RetrieveContextStep] Successfully generated embedding with fallback profile #{fallback_profile_id}")
+                Logger.info(
+                  "[RetrieveContextStep] Successfully generated embedding with fallback profile #{fallback_profile_id}"
+                )
+
                 {:ok, embedding}
 
               {:error, fallback_reason} ->
-                Logger.error("[RetrieveContextStep] Fallback embedding also failed: #{inspect(fallback_reason)}")
+                Logger.error(
+                  "[RetrieveContextStep] Fallback embedding also failed: #{inspect(fallback_reason)}"
+                )
+
                 {:error, {:embedding_failed, fallback_reason}}
             end
           else
@@ -247,7 +315,10 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
       end
     rescue
       UndefinedFunctionError ->
-        Logger.info("[RetrieveContextStep] Embedding service not available, skipping vector search")
+        Logger.info(
+          "[RetrieveContextStep] Embedding service not available, skipping vector search"
+        )
+
         {:error, :embedding_service_unavailable}
     end
   end
@@ -257,24 +328,24 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
   end
 
   # Extract embedding vector from the LLM response
-  defp extract_embedding_from_response(response) do
-    case response.raw do
-      %{data: data} when is_list(data) ->
-        case data do
-          [%{embedding: embedding} | _] when is_list(embedding) -> {:ok, embedding}
-          _ -> {:error, :no_embedding_in_response}
-        end
+  # defp extract_embedding_from_response(response) do
+  #   case response.raw do
+  #     %{data: data} when is_list(data) ->
+  #       case data do
+  #         [%{embedding: embedding} | _] when is_list(embedding) -> {:ok, embedding}
+  #         _ -> {:error, :no_embedding_in_response}
+  #       end
 
-      %{"data" => data} when is_list(data) ->
-        case data do
-          [%{"embedding" => embedding} | _] when is_list(embedding) -> {:ok, embedding}
-          _ -> {:error, :no_embedding_in_response}
-        end
+  #     %{"data" => data} when is_list(data) ->
+  #       case data do
+  #         [%{"embedding" => embedding} | _] when is_list(embedding) -> {:ok, embedding}
+  #         _ -> {:error, :no_embedding_in_response}
+  #       end
 
-      _ ->
-        {:error, :invalid_response_format}
-    end
-  end
+  #     _ ->
+  #       {:error, :invalid_response_format}
+  #   end
+  # end
 
   # Search the vector database using the query embedding
   defp search_vector_database(query_embedding, conversation_id, opts) do
@@ -311,7 +382,10 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
       end
     rescue
       UndefinedFunctionError ->
-        Logger.info("[RetrieveContextStep] Vector database not available, returning empty results")
+        Logger.info(
+          "[RetrieveContextStep] Vector database not available, returning empty results"
+        )
+
         {:ok, []}
     end
   end
@@ -385,18 +459,21 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
   # Try fallback embedding profile if primary fails
   defp try_fallback_embedding_profile(query, failed_profile, overrides, opts) do
     # Determine fallback profile
-    fallback_profile = cond do
-      # If we failed with the primary, try secondary from options
-      failed_profile == Map.get(opts, :embeddings_profile_id, @default_embeddings_profile_id) ->
-        Map.get(opts, :embeddings_profile_id_secondary, @secondary_embeddings_profile_id)
+    fallback_profile =
+      cond do
+        # If we failed with the primary, try secondary from options
+        failed_profile == Map.get(opts, :embeddings_profile_id, @default_embeddings_profile_id) ->
+          Map.get(opts, :embeddings_profile_id_secondary, @secondary_embeddings_profile_id)
 
-      # If we failed with secondary, try primary
-      failed_profile == Map.get(opts, :embeddings_profile_id_secondary, @secondary_embeddings_profile_id) ->
-        Map.get(opts, :embeddings_profile_id, @default_embeddings_profile_id)
+        # If we failed with secondary, try primary
+        failed_profile ==
+            Map.get(opts, :embeddings_profile_id_secondary, @secondary_embeddings_profile_id) ->
+          Map.get(opts, :embeddings_profile_id, @default_embeddings_profile_id)
 
-      # If we failed with some other profile, try default primary
-      true -> @default_embeddings_profile_id
-    end
+        # If we failed with some other profile, try default primary
+        true ->
+          @default_embeddings_profile_id
+      end
 
     # Don't retry with the same profile that just failed
     if fallback_profile == failed_profile do
@@ -412,11 +489,13 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.RetrieveContextStep d
   # Check if vector database infrastructure is available
   defp vector_db_available? do
     # Check if required modules exist and are loaded
-    embedding_available = Code.ensure_loaded?(AgentRuntime.Llm.Executor) and
-                         function_exported?(AgentRuntime.Llm.Executor, :embed, 4)
+    embedding_available =
+      Code.ensure_loaded?(AgentRuntime.Llm.Executor) and
+        function_exported?(AgentRuntime.Llm.Executor, :embed, 4)
 
-    vector_store_available = Code.ensure_loaded?(AgentInfra.StoreEcto.MemoryChunkStore) and
-                            function_exported?(AgentInfra.StoreEcto.MemoryChunkStore, :similarity_search, 2)
+    vector_store_available =
+      Code.ensure_loaded?(AgentInfra.StoreEcto.MemoryChunkStore) and
+        function_exported?(AgentInfra.StoreEcto.MemoryChunkStore, :similarity_search, 2)
 
     embedding_available and vector_store_available
   end
