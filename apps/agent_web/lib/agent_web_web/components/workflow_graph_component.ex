@@ -9,6 +9,7 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
   - Edge connections between workflow steps (with arrows)
   - Hover tooltips with step details
   - Real-time status updates during execution
+  - Execution state reset for new runs
   """
 
   use AgentWebWeb, :live_component
@@ -22,6 +23,7 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
   - `execution_state` - Current execution status of each node
   - `current_step` - Currently executing step (highlighted)
   - `class` - Additional CSS classes for the container
+  - `execution_id` - Unique ID for the current execution (triggers reset when changed)
   """
   def render(assigns) do
     assigns = assign_defaults(assigns)
@@ -36,8 +38,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
         >
           <!-- Background -->
           <rect width="800" height="1600" fill="transparent" />
-          
-    <!-- Definitions -->
+
+          <!-- Definitions -->
           <defs>
             <!-- Arrow marker -->
             <marker
@@ -54,19 +56,19 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
                 class="fill-current text-base-content/50"
               />
             </marker>
-            
-    <!-- Node shadow -->
+
+            <!-- Node shadow -->
             <filter id={"node-shadow-#{@id}"} x="-50%" y="-50%" width="200%" height="200%">
               <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25" />
             </filter>
           </defs>
-          
-    <!-- Edges (render first so they appear behind nodes) -->
+
+          <!-- Edges (render first so they appear behind nodes) -->
           <%= for edge <- @edges do %>
             <.workflow_edge edge={edge} marker_id={"arrowhead-#{@id}"} />
           <% end %>
-          
-    <!-- Nodes -->
+
+          <!-- Nodes -->
           <%= for node <- @nodes do %>
             <.workflow_node
               node={node}
@@ -77,8 +79,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
             />
           <% end %>
         </svg>
-        
-    <!-- Execution Progress Summary -->
+
+        <!-- Execution Progress Summary -->
         <%= if has_execution_progress?(@execution_state) do %>
           <div class="mt-4 p-3 bg-base-100 rounded-lg border border-base-300">
             <div class="flex items-center justify-between text-sm">
@@ -106,8 +108,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
             <% end %>
           </div>
         <% end %>
-        
-    <!-- Tooltips -->
+
+        <!-- Tooltips -->
         <div class="workflow-tooltips">
           <%= for node <- @nodes do %>
             <div
@@ -153,6 +155,34 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
       <% end %>
     </div>
     """
+  end
+
+  @doc """
+  Handle updates to the component.
+
+  This is called whenever assigns change. We use it to detect when a new
+  execution starts (execution_id changes) and reset the execution state.
+  """
+  def update(%{execution_id: new_id} = assigns, socket) do
+    old_id = socket.assigns[:execution_id]
+
+    socket =
+      if new_id != old_id and old_id != nil do
+        # New execution started - reset state
+        socket
+        |> assign(assigns)
+        |> assign(:execution_state, %{})
+        |> assign(:current_step, nil)
+      else
+        # Normal update
+        assign(socket, assigns)
+      end
+
+    {:ok, socket}
+  end
+
+  def update(assigns, socket) do
+    {:ok, assign(socket, assigns)}
   end
 
   # -------------------------
@@ -263,8 +293,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
           />
         <% end %>
       <% end %>
-      
-    <!-- Node label (below node, up to 2 lines) -->
+
+      <!-- Node label (below node, up to 2 lines) -->
       <text
         x={@node.x}
         y={@node.y + 62}
@@ -278,8 +308,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
           </tspan>
         <% end %>
       </text>
-      
-    <!-- Status indicators -->
+
+      <!-- Status indicators -->
       <%= cond do %>
         <% @node_status == :running -> %>
           <circle cx={@node.x + 26} cy={@node.y - 26} r="9" class="fill-warning animate-pulse" />
@@ -346,6 +376,7 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
     |> assign_new(:class, fn -> "" end)
     |> assign_new(:current_step, fn -> nil end)
     |> assign_new(:execution_state, fn -> %{} end)
+    |> assign_new(:execution_id, fn -> nil end)
     |> assign_new(:id, fn -> "default" end)
     |> compute_layout()
   end

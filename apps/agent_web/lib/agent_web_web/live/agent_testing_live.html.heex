@@ -147,6 +147,8 @@
                     workflow_spec={@workflow_graph}
                     execution_state={@workflow_execution_state}
                     current_step={@current_step_id}
+                    execution_id={@execution_id}
+                    class="h-full"
                   />
                 </div>
               <% else %>
@@ -243,59 +245,6 @@
                     />
                   <% end %>
                 </div>
-                
-<!-- Execution Status -->
-                <%= if @execution_status && @execution_status.status != :idle do %>
-                  <div class="border-t border-base-300 px-4 py-3 bg-base-50 flex-shrink-0">
-                    <div class="flex items-center justify-between text-sm mb-2">
-                      <div class="flex items-center gap-2">
-                        <%= case @execution_status.status do %>
-                          <% :running -> %>
-                            <span class="loading loading-spinner loading-xs text-warning"></span>
-                            <span class="text-warning font-medium">Executing</span>
-                          <% :completed -> %>
-                            <.icon name="hero-check-circle" class="size-4 text-success" />
-                            <span class="text-success font-medium">Completed</span>
-                          <% :failed -> %>
-                            <.icon name="hero-x-circle" class="size-4 text-error" />
-                            <span class="text-error font-medium">Failed</span>
-                          <% _ -> %>
-                            <span class="loading loading-spinner loading-xs"></span>
-                            <span class="font-medium">Processing</span>
-                        <% end %>
-
-                        <%= if @execution_status.current_step_name do %>
-                          <span class="text-base-content/70">
-                            : {@execution_status.current_step_name}
-                          </span>
-                        <% end %>
-                      </div>
-
-                      <div class="text-base-content/70">
-                        {@execution_status.completed_steps}/{@execution_status.total_steps}
-                      </div>
-                    </div>
-                    
-<!-- Progress Bar -->
-                    <%= if @execution_status.total_steps > 0 do %>
-                      <div class="w-full bg-base-300 rounded-full h-2">
-                        <div
-                          class={[
-                            "h-2 rounded-full transition-all duration-300",
-                            case @execution_status.status do
-                              :completed -> "bg-success"
-                              :failed -> "bg-error"
-                              :running -> "bg-warning"
-                              _ -> "bg-primary"
-                            end
-                          ]}
-                          style={"width: #{min(100, round(@execution_status.completed_steps / @execution_status.total_steps * 100))}%"}
-                        >
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
                 
 <!-- Message Input -->
                 <div class="border-t border-base-300 p-4 flex-shrink-0">

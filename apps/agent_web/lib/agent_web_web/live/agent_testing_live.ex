@@ -41,6 +41,7 @@ defmodule AgentWebWeb.AgentTestingLive do
       |> assign(:validation_results, nil)
       |> assign(:validation_running, false)
       |> assign(:current_step_id, nil)
+      |> assign(:execution_id, nil)
       |> load_available_agents()
 
     {:ok, socket}
@@ -73,6 +74,7 @@ defmodule AgentWebWeb.AgentTestingLive do
       |> assign(:selected_agent_id, agent_id)
       |> assign(:loading, true)
       |> assign(:error_info, nil)
+      |> assign(:execution_id, nil)
       |> reset_workflow_state()
       |> load_agent_workflow(agent_id)
       |> update_chat_interface_for_agent(agent_id)
@@ -431,6 +433,8 @@ defmodule AgentWebWeb.AgentTestingLive do
         "messages" => [%{"role" => "user", "content" => message}]
       }
 
+      execution_id = generate_execution_id()
+
       payload = %{
         # Default profile for testing
         "profile_id" => "req_llm",
@@ -452,6 +456,9 @@ defmodule AgentWebWeb.AgentTestingLive do
         |> assign(:error_info, nil)
         |> assign(:streaming, true)
         |> assign(:stream_buffer, "")
+        |> assign(:execution_id, execution_id)
+        |> assign(:workflow_execution_state, %{})
+        |> assign(:current_step_id, nil)
         |> update_execution_status(:running)
 
       # Start SSE streaming
@@ -1535,5 +1542,9 @@ defmodule AgentWebWeb.AgentTestingLive do
     )
 
     socket
+  end
+
+  defp generate_execution_id do
+    :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   end
 end
