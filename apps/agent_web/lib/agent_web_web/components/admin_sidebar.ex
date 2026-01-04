@@ -14,7 +14,13 @@ defmodule AgentWebWeb.AdminSidebar do
       %{key: :runs, label: "Run History", href: "/admin/runs", icon: "hero-clock"}
     ],
     operations: [
-      %{key: :chat, label: "Chat", href: "/admin/chat", icon: "hero-chat-bubble-left-right"}
+      %{key: :chat, label: "Chat", href: "/admin/chat", icon: "hero-chat-bubble-left-right"},
+      %{
+        key: :agent_testing,
+        label: "RAG History Chat",
+        href: "/admin/agent-testing",
+        icon: "hero-document-magnifying-glass"
+      }
     ],
     management: [
       %{key: :settings, label: "Settings", href: "/admin/settings", icon: "hero-cog-6-tooth"},
@@ -34,7 +40,8 @@ defmodule AgentWebWeb.AdminSidebar do
     # Δεν το ορίζουμε ποτέ εδώ - μόνο το διαβάζουμε από τα assigns
     {:ok,
      socket
-     |> assign(assigns)  # Αυτό περιλαμβάνει το :collapsed από το parent
+     # Αυτό περιλαμβάνει το :collapsed από το parent
+     |> assign(assigns)
      |> assign(:breadcrumbs, breadcrumbs)
      |> assign(:navigation_sections, @navigation_sections)
      |> assign(:is_mobile?, is_mobile?)}
@@ -85,8 +92,8 @@ defmodule AgentWebWeb.AdminSidebar do
             <.icon name="hero-x-mark" class="size-5" />
           </button>
         </div>
-
-        <!-- Breadcrumbs -->
+        
+    <!-- Breadcrumbs -->
         <div :if={!@collapsed} class="px-4 py-3 border-b border-base-300">
           <nav class="text-sm" aria-label="Breadcrumb">
             <ol class="flex space-x-2">
@@ -99,8 +106,8 @@ defmodule AgentWebWeb.AdminSidebar do
             </ol>
           </nav>
         </div>
-
-        <!-- Navigation Content -->
+        
+    <!-- Navigation Content -->
         <nav class="p-4 space-y-6 flex-1 overflow-y-auto">
           <div class="space-y-2">
             <h3 :if={!@collapsed} class="text-xs font-semibold text-gray-500 uppercase">
@@ -159,8 +166,8 @@ defmodule AgentWebWeb.AdminSidebar do
             </a>
           </div>
         </nav>
-
-        <!-- Toggle Button -->
+        
+    <!-- Toggle Button -->
         <div class="p-4 border-t border-gray-200">
           <button
             class="flex items-center justify-center w-full p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -201,6 +208,7 @@ defmodule AgentWebWeb.AdminSidebar do
         :dashboard -> %{label: "Dashboard", path: "/admin/dashboard"}
         :runs -> %{label: "Run History", path: "/admin/runs"}
         :chat -> %{label: "Chat Management", path: "/admin/chat"}
+        :agent_testing -> %{label: "RAG History Chat", path: "/admin/agent-testing"}
         :settings -> %{label: "Settings", path: "/admin/settings"}
         :profiles -> %{label: "Profile Management", path: "/admin/profiles"}
         :agents -> %{label: "Agent Management", path: "/admin/agents"}

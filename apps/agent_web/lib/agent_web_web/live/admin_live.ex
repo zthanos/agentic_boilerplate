@@ -49,6 +49,7 @@ defmodule AgentWebWeb.AdminLive do
     new_state = !socket.assigns.sidebar_collapsed
     {:noreply, assign(socket, :sidebar_collapsed, new_state)}
   end
+
   @impl true
   def handle_params(_params, _uri, socket) do
     # Δεν χρειάζεται να κάνουμε κάτι εδώ αν το current_page ορίζεται ήδη

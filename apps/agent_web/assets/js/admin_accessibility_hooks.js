@@ -230,14 +230,19 @@ export const ScreenReaderAnnouncer = {
   },
   
   createAnnouncementRegion() {
-    // Create a live region for screen reader announcements
-    this.announcementRegion = document.createElement('div');
-    this.announcementRegion.setAttribute('aria-live', 'polite');
-    this.announcementRegion.setAttribute('aria-atomic', 'true');
-    this.announcementRegion.className = 'sr-only';
-    this.announcementRegion.id = 'screen-reader-announcements';
+    // Use existing announcement region or create one if it doesn't exist
+    this.announcementRegion = document.getElementById('screen-reader-announcements');
     
-    document.body.appendChild(this.announcementRegion);
+    if (!this.announcementRegion) {
+      // Create a live region for screen reader announcements
+      this.announcementRegion = document.createElement('div');
+      this.announcementRegion.setAttribute('aria-live', 'polite');
+      this.announcementRegion.setAttribute('aria-atomic', 'true');
+      this.announcementRegion.className = 'sr-only';
+      this.announcementRegion.id = 'screen-reader-announcements';
+      
+      document.body.appendChild(this.announcementRegion);
+    }
     
     // Listen for announcement events
     this.handleEvent('announce', ({ message, priority = 'polite' }) => {

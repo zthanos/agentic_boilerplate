@@ -91,11 +91,12 @@ defmodule AgentWebWeb.MessagesComponent do
                   <.assistant_icon class="w-4 h-4" />
                 </div>
                 <span class="text-sm font-bold text-primary italic animate-pulse">
-                  Assistant is thinking...
+                  Assistant is responding...
                 </span>
               </div>
 
               <div class="pl-11">
+                <!-- Only display response content, no workflow steps -->
                 <div class="prose prose-sm max-w-none dark:prose-invert">
                   {raw(render_markdown(@stream_buffer))}
                 </div>

@@ -22,7 +22,7 @@ defmodule AgentRuntime.Llm.AgentExecutor do
     end
   end
 
-  def execute_agent_stream(profile, overrides, input, exec_meta, on_chunk, opts \\ []) do
+  def execute_agent_stream(profile, overrides, input, exec_meta, on_chunk, on_workflow_progress, opts \\ []) do
     agent_id = Keyword.fetch!(opts, :agent_id)
     agent_version = Keyword.get(opts, :agent_version, :latest)
 
@@ -43,25 +43,9 @@ defmodule AgentRuntime.Llm.AgentExecutor do
       # For streaming, add the callback to the workflow input so steps can use it
       workflow_input_with_streaming = Map.put(workflow_input, :on_chunk, on_chunk)
 
-      # Also add a workflow progress callback for structured updates
-      workflow_progress_callback = fn step_id, status, metadata ->
-        # Send structured workflow progress (this could be enhanced to send via SSE)
-        case status do
-          :start ->
-            on_chunk.("🔄 Starting: #{format_step_name(step_id)}")
-
-          :complete ->
-            duration = Map.get(metadata, :duration_ms, 0)
-            on_chunk.("✅ Completed: #{format_step_name(step_id)} (#{duration}ms)")
-
-          :error ->
-            error = Map.get(metadata, :error, "Unknown error")
-            on_chunk.("❌ Failed: #{format_step_name(step_id)} - #{error}")
-        end
-      end
-
+      # Use the provided workflow progress callback directly
       workflow_input_with_callbacks =
-        Map.put(workflow_input_with_streaming, :on_workflow_progress, workflow_progress_callback)
+        Map.put(workflow_input_with_streaming, :on_workflow_progress, on_workflow_progress)
 
       start_time = System.monotonic_time(:millisecond)
       result = WorkflowRuntime.execute(workflow_spec, workflow_input_with_callbacks, %{})

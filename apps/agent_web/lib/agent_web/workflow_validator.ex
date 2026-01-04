@@ -274,6 +274,10 @@ defmodule AgentWeb.WorkflowValidator do
             fn chunk ->
               send(self(), {:chunk, chunk})
             end,
+            fn _step_id, _status, _metadata ->
+              # Workflow progress callback - not needed for validation tests
+              :ok
+            end,
             agent_id: agent_id,
             agent_version: agent_version
           )

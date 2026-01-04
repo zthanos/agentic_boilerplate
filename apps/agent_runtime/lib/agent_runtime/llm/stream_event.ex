@@ -5,7 +5,8 @@ defmodule AgentRuntime.Llm.StreamEvent do
   This is a runtime domain concept, independent of web transport.
   """
 
-  @type event_type :: :open | :token | :done | :clarify | :error | :ping
+  @type event_type ::
+          :open | :token | :done | :clarify | :error | :ping | :step_execution | :close
 
   @type t :: %__MODULE__{
           event: event_type(),
@@ -58,6 +59,64 @@ defmodule AgentRuntime.Llm.StreamEvent do
 
   def ping() do
     new(:ping, %{"ts" => System.system_time(:millisecond)})
+  end
+
+  def close() do
+    new(:close, %{})
+  end
+
+  @doc """
+  Creates a step execution event for workflow progress tracking.
+
+  ## Parameters
+  - step_name: Human-readable name of the workflow step
+  - status: Current status ("starting", "completed", "failed", "skipped")
+  - opts: Optional keyword list with additional data
+    - :execution_time_ms - Time taken for step completion (for "completed" status)
+    - :error - Error details (for "failed" status)
+    - :step_id - Unique step identifier
+
+  ## Examples
+      iex> StreamEvent.step_execution("Generate Query", "starting")
+      %StreamEvent{event: :step_execution, data: %{"step_name" => "Generate Query", "status" => "starting", "timestamp" => ...}}
+
+      iex> StreamEvent.step_execution("Generate Query", "completed", execution_time_ms: 1250)
+      %StreamEvent{event: :step_execution, data: %{"step_name" => "Generate Query", "status" => "completed", "timestamp" => ..., "execution_time_ms" => 1250}}
+  """
+  def step_execution(step_name, status, opts \\ [])
+      when is_binary(step_name) and is_binary(status) do
+    data = %{
+      "step_name" => step_name,
+      "status" => status,
+      "timestamp" => System.system_time(:millisecond)
+    }
+
+    data =
+      data
+      |> maybe_put("execution_time_ms", opts[:execution_time_ms])
+      |> maybe_put("error", opts[:error])
+      |> maybe_put("step_id", opts[:step_id])
+
+    new(:step_execution, data)
+  end
+
+  # Convenience constructors for step execution events
+  def step_starting(step_name, opts \\ []) do
+    step_execution(step_name, "starting", opts)
+  end
+
+  def step_completed(step_name, execution_time_ms, opts \\ []) do
+    opts = Keyword.put(opts, :execution_time_ms, execution_time_ms)
+    step_execution(step_name, "completed", opts)
+  end
+
+  def step_failed(step_name, error, opts \\ []) do
+    opts = Keyword.put(opts, :error, error)
+    step_execution(step_name, "failed", opts)
+  end
+
+  def step_skipped(step_name, opts \\ []) do
+    step_execution(step_name, "skipped", opts)
   end
 
   defp maybe_put(map, _key, nil), do: map

@@ -1,16 +1,26 @@
 defmodule AgentWebWeb.AgentTestingLive do
   use AgentWebWeb, :live_view
   import AgentWebWeb.MessagesComponent
-  import AgentWebWeb.IconsComponent
-  alias AgentWebWeb.Layouts
+  alias AgentWebWeb.AdminLayouts
   alias AgentRuntime.Llm.Agent.Store, as: AgentStoreDI
   alias AgentWeb.AgentSeeder
   alias AgentWeb.ErrorHandler
+
+  require Logger
+  require AgentWebWeb.IconsComponent
 
   @impl true
   def mount(_params, _session, socket) do
     socket =
       socket
+      # ✅ Admin layout assigns
+      |> assign(:current_page, :agent_testing)
+      |> assign(:current_section, :operations)
+      |> assign(:sidebar_collapsed, false)
+      |> assign(:page_title, "RAG History Chat")
+      |> assign(:loading, false)
+      |> assign(:error, nil)
+      # Agent testing specific assigns
       |> assign(:selected_agent_id, nil)
       |> assign(:available_agents, [])
       |> assign(:workflow_graph, nil)
@@ -25,16 +35,33 @@ defmodule AgentWebWeb.AgentTestingLive do
         current_step_name: nil
       })
       |> assign(:sse_connection_id, nil)
-      |> assign(:loading, false)
-      # Changed from :error to :error_info
       |> assign(:error_info, nil)
       |> assign(:streaming, false)
       |> assign(:stream_buffer, "")
       |> assign(:validation_results, nil)
       |> assign(:validation_running, false)
+      |> assign(:current_step_id, nil)
       |> load_available_agents()
 
     {:ok, socket}
+  end
+
+  # ✅ Sidebar toggle handlers
+  @impl true
+  def handle_info({:toggle_sidebar}, socket) do
+    new_state = !socket.assigns.sidebar_collapsed
+    {:noreply, assign(socket, :sidebar_collapsed, new_state)}
+  end
+
+  @impl true
+  def handle_event("toggle_sidebar", _params, socket) do
+    new_state = !socket.assigns.sidebar_collapsed
+    {:noreply, assign(socket, :sidebar_collapsed, new_state)}
+  end
+
+  @impl true
+  def handle_event("set_sidebar_state", %{"collapsed" => collapsed}, socket) do
+    {:noreply, assign(socket, :sidebar_collapsed, collapsed)}
   end
 
   @impl true
@@ -85,6 +112,7 @@ defmodule AgentWebWeb.AgentTestingLive do
   # SSE Event Handlers for streaming chat
   @impl true
   def handle_event("sse_token", %{"token" => token}, socket) do
+    # Only handle clean LLM response tokens - no workflow progress mixed in
     buf = (socket.assigns.stream_buffer || "") <> (token || "")
     {:noreply, assign(socket, :stream_buffer, buf)}
   end
@@ -107,7 +135,8 @@ defmodule AgentWebWeb.AgentTestingLive do
       |> to_string()
       |> String.trim()
 
-    # Add assistant message to chat
+    # Create assistant message with clean LLM response content only
+    # Workflow progress is handled separately and not mixed into message content
     assistant_message =
       create_assistant_message(assistant_text, %{
         run_id: run_id,
@@ -186,6 +215,39 @@ defmodule AgentWebWeb.AgentTestingLive do
       |> assign(:error_info, error_info)
       |> update_execution_status(:failed)
       |> maybe_update_workflow_error(workflow_error)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("sse_step_execution", payload, socket) do
+    step_name = Map.get(payload, "step_name")
+    status = Map.get(payload, "status")
+    step_id_raw = Map.get(payload, "step_id")
+    execution_time_ms = Map.get(payload, "execution_time_ms")
+    error = Map.get(payload, "error")
+    timestamp = Map.get(payload, "timestamp")
+
+    # Convert step_id to atom if it's a string (JSON serialization converts atoms to strings)
+    step_id =
+      case step_id_raw do
+        step_id when is_binary(step_id) ->
+          try do
+            String.to_existing_atom(step_id)
+          rescue
+            # Keep as string if atom doesn't exist
+            ArgumentError -> step_id_raw
+          end
+
+        # Keep as-is if already an atom or other type
+        step_id ->
+          step_id
+      end
+
+    socket =
+      socket
+      |> update_workflow_progress(step_name, status, step_id, execution_time_ms, error)
+      |> maybe_update_execution_status(status, step_name)
 
     {:noreply, socket}
   end
@@ -439,336 +501,336 @@ defmodule AgentWebWeb.AgentTestingLive do
     {:noreply, socket}
   end
 
-  @impl true
-  def render(assigns) do
-    ~H"""
-    <div phx-hook="LlmSSE" id="agent-testing-sse">
-      <Layouts.app flash={@flash}>
-        <div class="min-h-screen bg-base-100">
-          <div class="container mx-auto px-4 py-6">
-            <!-- Header -->
-            <div class="mb-6">
-              <h1 class="text-3xl font-bold text-base-content">Agent Testing Interface</h1>
+  # @impl true
+  # def render(assigns) do
+  #   ~H"""
+  #   <div phx-hook="LlmSSE" id="agent-testing-sse">
+  #     <Layouts.app flash={@flash}>
+  #       <div class="min-h-screen bg-base-100">
+  #         <div class="container mx-auto px-4 py-6">
+  #           <!-- Header -->
+  #           <div class="mb-6">
+  #             <h1 class="text-3xl font-bold text-base-content">Agent Testing Interface</h1>
 
-              <p class="text-base-content/70 mt-2">
-                Test and validate agent behavior through interactive workflows and real-time monitoring
-              </p>
-            </div>
-            <!-- Agent Selection Section -->
-            <div class="mb-6">
-              <div class="card bg-base-200 shadow-xl">
-                <div class="card-body">
-                  <h2 class="card-title">Agent Selection</h2>
+  #             <p class="text-base-content/70 mt-2">
+  #               Test and validate agent behavior through interactive workflows and real-time monitoring
+  #             </p>
+  #           </div>
+  #           <!-- Agent Selection Section -->
+  #           <div class="mb-6">
+  #             <div class="card bg-base-200 shadow-xl">
+  #               <div class="card-body">
+  #                 <h2 class="card-title">Agent Selection</h2>
 
-                  <%= if @available_agents == [] do %>
-                    <div class="alert alert-info">
-                      <div>
-                        <h3 class="font-bold">No agents available</h3>
+  #                 <%= if @available_agents == [] do %>
+  #                   <div class="alert alert-info">
+  #                     <div>
+  #                       <h3 class="font-bold">No agents available</h3>
 
-                        <div class="text-sm">
-                          No agents are currently available for testing. You can seed test agents to get started.
-                        </div>
-                      </div>
-                    </div>
+  #                       <div class="text-sm">
+  #                         No agents are currently available for testing. You can seed test agents to get started.
+  #                       </div>
+  #                     </div>
+  #                   </div>
 
-                    <div class="card-actions justify-end">
-                      <button
-                        class="btn btn-primary"
-                        phx-click="seed_agents"
-                        disabled={@loading}
-                      >
-                        {if @loading, do: "Seeding...", else: "Seed Test Agents"}
-                      </button>
-                    </div>
-                  <% else %>
-                    <form phx-change="select_agent">
-                      <div class="form-control w-full max-w-xs">
-                        <label class="label">
-                          <span class="label-text">Select an agent to test:</span>
-                        </label>
-                        <select
-                          class="select select-bordered w-full max-w-xs"
-                          name="agent_id"
-                        >
-                          <option disabled selected={@selected_agent_id == nil}>
-                            Choose an agent
-                          </option>
+  #                   <div class="card-actions justify-end">
+  #                     <button
+  #                       class="btn btn-primary"
+  #                       phx-click="seed_agents"
+  #                       disabled={@loading}
+  #                     >
+  #                       {if @loading, do: "Seeding...", else: "Seed Test Agents"}
+  #                     </button>
+  #                   </div>
+  #                 <% else %>
+  #                   <form phx-change="select_agent">
+  #                     <div class="form-control w-full max-w-xs">
+  #                       <label class="label">
+  #                         <span class="label-text">Select an agent to test:</span>
+  #                       </label>
+  #                       <select
+  #                         class="select select-bordered w-full max-w-xs"
+  #                         name="agent_id"
+  #                       >
+  #                         <option disabled selected={@selected_agent_id == nil}>
+  #                           Choose an agent
+  #                         </option>
 
-                          <%= for agent <- @available_agents do %>
-                            <option
-                              value={agent.id}
-                              selected={@selected_agent_id == agent.id}
-                            >
-                              {agent.name || agent.id}
-                              <%= if Map.get(agent.metadata || %{}, "test_mode") do %>
-                                (Test Agent)
-                              <% end %>
-                            </option>
-                          <% end %>
-                        </select>
-                      </div>
-                    </form>
-                  <% end %>
+  #                         <%= for agent <- @available_agents do %>
+  #                           <option
+  #                             value={agent.id}
+  #                             selected={@selected_agent_id == agent.id}
+  #                           >
+  #                             {agent.name || agent.id}
+  #                             <%= if Map.get(agent.metadata || %{}, "test_mode") do %>
+  #                               (Test Agent)
+  #                             <% end %>
+  #                           </option>
+  #                         <% end %>
+  #                       </select>
+  #                     </div>
+  #                   </form>
+  #                 <% end %>
 
-                  <%= if @error_info do %>
-                    <.live_component
-                      module={AgentWebWeb.ErrorDisplayComponent}
-                      id="main-error"
-                      error={@error_info.message}
-                      error_type={@error_info.type}
-                      context={@error_info.context}
-                      recovery_actions={@error_info.recovery_actions}
-                      dismissible={true}
-                      class="mt-4"
-                    />
-                  <% end %>
-                </div>
-              </div>
-            </div>
-            <!-- Main Interface Grid -->
-            <%= if @selected_agent_id do %>
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Workflow Graph Section -->
-                <div class="card bg-base-200 shadow-xl">
-                  <div class="card-body">
-                    <div class="flex items-center justify-between mb-4">
-                      <h2 class="card-title">Workflow Visualization</h2>
-                      <!-- Validation Controls -->
-                      <div class="flex gap-2">
-                        <button
-                          class="btn btn-sm btn-outline"
-                          phx-click="run_validation_tests"
-                          disabled={@validation_running || @streaming}
-                        >
-                          <%= if @validation_running do %>
-                            <span class="loading loading-spinner loading-xs"></span> Validating...
-                          <% else %>
-                            🧪 Run Tests
-                          <% end %>
-                        </button>
-                        <%= if @validation_results do %>
-                          <button
-                            class="btn btn-sm btn-ghost"
-                            phx-click="clear_validation_results"
-                          >
-                            Clear Results
-                          </button>
-                        <% end %>
-                      </div>
-                    </div>
+  #                 <%= if @error_info do %>
+  #                   <.live_component
+  #                     module={AgentWebWeb.ErrorDisplayComponent}
+  #                     id="main-error"
+  #                     error={@error_info.message}
+  #                     error_type={@error_info.type}
+  #                     context={@error_info.context}
+  #                     recovery_actions={@error_info.recovery_actions}
+  #                     dismissible={true}
+  #                     class="mt-4"
+  #                   />
+  #                 <% end %>
+  #               </div>
+  #             </div>
+  #           </div>
+  #           <!-- Main Interface Grid -->
+  #           <%= if @selected_agent_id do %>
+  #             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  #               <!-- Workflow Graph Section -->
+  #               <div class="card bg-base-200 shadow-xl">
+  #                 <div class="card-body">
+  #                   <div class="flex items-center justify-between mb-4">
+  #                     <h2 class="card-title">Workflow Visualization</h2>
+  #                     <!-- Validation Controls -->
+  #                     <div class="flex gap-2">
+  #                       <button
+  #                         class="btn btn-sm btn-outline"
+  #                         phx-click="run_validation_tests"
+  #                         disabled={@validation_running || @streaming}
+  #                       >
+  #                         <%= if @validation_running do %>
+  #                           <span class="loading loading-spinner loading-xs"></span> Validating...
+  #                         <% else %>
+  #                           🧪 Run Tests
+  #                         <% end %>
+  #                       </button>
+  #                       <%= if @validation_results do %>
+  #                         <button
+  #                           class="btn btn-sm btn-ghost"
+  #                           phx-click="clear_validation_results"
+  #                         >
+  #                           Clear Results
+  #                         </button>
+  #                       <% end %>
+  #                     </div>
+  #                   </div>
 
-                    <%= if @workflow_graph do %>
-                      <.live_component
-                        module={AgentWebWeb.WorkflowGraphComponent}
-                        id="workflow-graph"
-                        workflow_spec={@workflow_graph}
-                        execution_state={@workflow_execution_state}
-                        current_step={@execution_status.current_step_name}
-                        class="h-96"
-                      />
-                    <% else %>
-                      <div class="alert alert-info">
-                        <div>
-                          <div class="text-sm">
-                            Workflow graph will be loaded when an agent is selected and initialized.
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                    <!-- Validation Results Display -->
-                    <%= if @validation_results do %>
-                      <div class="mt-4 p-4 bg-base-100 rounded-lg border border-base-300">
-                        <h3 class="font-semibold mb-2 flex items-center gap-2">
-                          🧪 Validation Results
-                          <%= if @validation_results.passed == @validation_results.total_tests do %>
-                            <span class="badge badge-success">All Passed</span>
-                          <% else %>
-                            <span class="badge badge-error">{@validation_results.failed} Failed</span>
-                          <% end %>
-                        </h3>
+  #                   <%= if @workflow_graph do %>
+  #                     <.live_component
+  #                       module={AgentWebWeb.WorkflowGraphComponent}
+  #                       id="workflow-graph"
+  #                       workflow_spec={@workflow_graph}
+  #                       execution_state={@workflow_execution_state}
+  #                       current_step={@execution_status.current_step_name}
+  #                       class="h-96"
+  #                     />
+  #                   <% else %>
+  #                     <div class="alert alert-info">
+  #                       <div>
+  #                         <div class="text-sm">
+  #                           Workflow graph will be loaded when an agent is selected and initialized.
+  #                         </div>
+  #                       </div>
+  #                     </div>
+  #                   <% end %>
+  #                   <!-- Validation Results Display -->
+  #                   <%= if @validation_results do %>
+  #                     <div class="mt-4 p-4 bg-base-100 rounded-lg border border-base-300">
+  #                       <h3 class="font-semibold mb-2 flex items-center gap-2">
+  #                         🧪 Validation Results
+  #                         <%= if @validation_results.passed == @validation_results.total_tests do %>
+  #                           <span class="badge badge-success">All Passed</span>
+  #                         <% else %>
+  #                           <span class="badge badge-error">{@validation_results.failed} Failed</span>
+  #                         <% end %>
+  #                       </h3>
 
-                        <div class="text-sm text-base-content/70 mb-3">
-                          {@validation_results.passed}/{@validation_results.total_tests} tests passed
-                          in {@validation_results.execution_time_ms}ms
-                        </div>
+  #                       <div class="text-sm text-base-content/70 mb-3">
+  #                         {@validation_results.passed}/{@validation_results.total_tests} tests passed
+  #                         in {@validation_results.execution_time_ms}ms
+  #                       </div>
 
-                        <div class="space-y-2">
-                          <%= for result <- @validation_results.results do %>
-                            <div class={[
-                              "p-3 rounded border-l-4",
-                              if(result.status == :passed,
-                                do: "bg-success/10 border-success",
-                                else: "bg-error/10 border-error"
-                              )
-                            ]}>
-                              <div class="flex items-center gap-2 mb-1">
-                                <%= if result.status == :passed do %>
-                                  <span class="text-success">✓</span>
-                                <% else %>
-                                  <span class="text-error">✗</span>
-                                <% end %>
-                                <span class="font-medium text-sm">{result.test_name}</span>
-                                <span class="text-xs text-base-content/50">
-                                  ({result.execution_time_ms}ms)
-                                </span>
-                              </div>
+  #                       <div class="space-y-2">
+  #                         <%= for result <- @validation_results.results do %>
+  #                           <div class={[
+  #                             "p-3 rounded border-l-4",
+  #                             if(result.status == :passed,
+  #                               do: "bg-success/10 border-success",
+  #                               else: "bg-error/10 border-error"
+  #                             )
+  #                           ]}>
+  #                             <div class="flex items-center gap-2 mb-1">
+  #                               <%= if result.status == :passed do %>
+  #                                 <span class="text-success">✓</span>
+  #                               <% else %>
+  #                                 <span class="text-error">✗</span>
+  #                               <% end %>
+  #                               <span class="font-medium text-sm">{result.test_name}</span>
+  #                               <span class="text-xs text-base-content/50">
+  #                                 ({result.execution_time_ms}ms)
+  #                               </span>
+  #                             </div>
 
-                              <div class="text-xs text-base-content/70">{result.details}</div>
-                            </div>
-                          <% end %>
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
-                </div>
-                <!-- Chat Interface Section -->
-                <div class="card bg-base-200 shadow-xl">
-                  <div class="card-body">
-                    <div class="flex items-center justify-between mb-4">
-                      <h2 class="card-title">Chat Interface</h2>
+  #                             <div class="text-xs text-base-content/70">{result.details}</div>
+  #                           </div>
+  #                         <% end %>
+  #                       </div>
+  #                     </div>
+  #                   <% end %>
+  #                 </div>
+  #               </div>
+  #               <!-- Chat Interface Section -->
+  #               <div class="card bg-base-200 shadow-xl">
+  #                 <div class="card-body">
+  #                   <div class="flex items-center justify-between mb-4">
+  #                     <h2 class="card-title">Chat Interface</h2>
 
-                      <%= if @selected_agent_id do %>
-                        <div class="badge badge-primary badge-outline">
-                          Agent: {get_selected_agent_name(assigns)}
-                        </div>
-                      <% end %>
-                    </div>
-                    <!-- Chat Messages Container -->
-                    <div class="bg-base-100 rounded-lg border border-base-300 h-96 flex flex-col">
-                      <!-- Messages Display -->
-                      <div class="flex-1 overflow-y-auto p-4">
-                        <%= if @chat_messages == [] do %>
-                          <div class="text-center text-base-content/50 mt-8">
-                            <div class="text-lg font-semibold mb-2">Start Testing</div>
+  #                     <%= if @selected_agent_id do %>
+  #                       <div class="badge badge-primary badge-outline">
+  #                         Agent: {get_selected_agent_name(assigns)}
+  #                       </div>
+  #                     <% end %>
+  #                   </div>
+  #                   <!-- Chat Messages Container -->
+  #                   <div class="bg-base-100 rounded-lg border border-base-300 h-96 flex flex-col">
+  #                     <!-- Messages Display -->
+  #                     <div class="flex-1 overflow-y-auto p-4">
+  #                       <%= if @chat_messages == [] do %>
+  #                         <div class="text-center text-base-content/50 mt-8">
+  #                           <div class="text-lg font-semibold mb-2">Start Testing</div>
 
-                            <div class="text-sm">
-                              Send a message to begin testing the selected agent
-                            </div>
-                          </div>
-                        <% else %>
-                          <.messages
-                            messages={@chat_messages}
-                            streaming={@streaming}
-                            stream_buffer={@stream_buffer}
-                            conversation_id={generate_conversation_id(@selected_agent_id)}
-                          />
-                        <% end %>
-                      </div>
-                      <!-- Workflow Progress Indicator -->
-                      <%= if @execution_status && @execution_status.status != :idle do %>
-                        <div class="border-t border-base-300 px-4 py-2 bg-base-50">
-                          <div class="flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-2">
-                              <%= case @execution_status.status do %>
-                                <% :running -> %>
-                                  <div class="loading loading-spinner loading-xs text-warning"></div>
-                                  <span class="text-warning font-medium">Executing</span>
-                                <% :completed -> %>
-                                  <div class="text-success">✓</div>
-                                  <span class="text-success font-medium">Completed</span>
-                                <% :failed -> %>
-                                  <div class="text-error">✗</div>
-                                  <span class="text-error font-medium">Failed</span>
-                                <% _ -> %>
-                                  <div class="loading loading-spinner loading-xs"></div>
-                                  <span class="font-medium">Processing</span>
-                              <% end %>
+  #                           <div class="text-sm">
+  #                             Send a message to begin testing the selected agent
+  #                           </div>
+  #                         </div>
+  #                       <% else %>
+  #                         <.messages
+  #                           messages={@chat_messages}
+  #                           streaming={@streaming}
+  #                           stream_buffer={@stream_buffer}
+  #                           conversation_id={generate_conversation_id(@selected_agent_id)}
+  #                         />
+  #                       <% end %>
+  #                     </div>
+  #                     <!-- Workflow Progress Indicator -->
+  #                     <%= if @execution_status && @execution_status.status != :idle do %>
+  #                       <div class="border-t border-base-300 px-4 py-2 bg-base-50">
+  #                         <div class="flex items-center justify-between text-sm">
+  #                           <div class="flex items-center gap-2">
+  #                             <%= case @execution_status.status do %>
+  #                               <% :running -> %>
+  #                                 <div class="loading loading-spinner loading-xs text-warning"></div>
+  #                                 <span class="text-warning font-medium">Executing</span>
+  #                               <% :completed -> %>
+  #                                 <div class="text-success">✓</div>
+  #                                 <span class="text-success font-medium">Completed</span>
+  #                               <% :failed -> %>
+  #                                 <div class="text-error">✗</div>
+  #                                 <span class="text-error font-medium">Failed</span>
+  #                               <% _ -> %>
+  #                                 <div class="loading loading-spinner loading-xs"></div>
+  #                                 <span class="font-medium">Processing</span>
+  #                             <% end %>
 
-                              <%= if @execution_status.current_step_name do %>
-                                <span class="text-base-content/70">
-                                  : {@execution_status.current_step_name}
-                                </span>
-                              <% end %>
-                            </div>
+  #                             <%= if @execution_status.current_step_name do %>
+  #                               <span class="text-base-content/70">
+  #                                 : {@execution_status.current_step_name}
+  #                               </span>
+  #                             <% end %>
+  #                           </div>
 
-                            <div class="text-base-content/70">
-                              {@execution_status.completed_steps}/{@execution_status.total_steps} steps
-                            </div>
-                          </div>
-                          <!-- Progress bar -->
-                          <%= if @execution_status.total_steps > 0 do %>
-                            <div class="mt-2">
-                              <div class="w-full bg-base-300 rounded-full h-1.5">
-                                <div
-                                  class={[
-                                    "h-1.5 rounded-full transition-all duration-300",
-                                    case @execution_status.status do
-                                      :completed -> "bg-success"
-                                      :failed -> "bg-error"
-                                      :running -> "bg-warning"
-                                      _ -> "bg-primary"
-                                    end
-                                  ]}
-                                  style={"width: #{min(100, round(@execution_status.completed_steps / @execution_status.total_steps * 100))}%"}
-                                >
-                                </div>
-                              </div>
-                            </div>
-                          <% end %>
-                          <!-- Execution timing -->
-                          <%= if @execution_status.started_at do %>
-                            <div class="mt-1 text-xs text-base-content/50">
-                              <%= if @execution_status.completed_at do %>
-                                Completed in {calculate_execution_duration(@execution_status)}
-                              <% else %>
-                                Started {format_relative_time(@execution_status.started_at)}
-                              <% end %>
-                            </div>
-                          <% end %>
-                        </div>
-                      <% end %>
-                      <!-- SSE Connection Status -->
-                      <%= if @streaming do %>
-                        <div class="border-t border-base-300 px-4 py-1 bg-info/10">
-                          <div class="flex items-center gap-2 text-xs text-info">
-                            <div class="w-2 h-2 bg-info rounded-full animate-pulse"></div>
-                            <span>Connected to agent stream</span>
-                          </div>
-                        </div>
-                      <% end %>
-                      <!-- Message Input -->
-                      <div class="border-t border-base-300 p-4">
-                        <form phx-submit="send_chat_message" class="flex gap-2">
-                          <input
-                            type="text"
-                            name="message"
-                            placeholder="Type your test message..."
-                            class="input input-bordered flex-1"
-                            disabled={@streaming || !@selected_agent_id}
-                          />
-                          <button
-                            type="submit"
-                            class="btn btn-primary"
-                            disabled={@streaming || !@selected_agent_id}
-                          >
-                            {if @streaming, do: "Sending...", else: "Send"}
-                          </button>
-                        </form>
-                        <!-- Error Display with Recovery Options -->
-                        <%= if @error_info do %>
-                          <.live_component
-                            module={AgentWebWeb.ErrorDisplayComponent}
-                            id="chat-error"
-                            error={@error_info.message}
-                            error_type={@error_info.type}
-                            context={@error_info.context}
-                            recovery_actions={@error_info.recovery_actions}
-                            dismissible={true}
-                            class="mt-2"
-                          />
-                        <% end %>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            <% end %>
-          </div>
-        </div>
-      </Layouts.app>
-    </div>
-    """
-  end
+  #                           <div class="text-base-content/70">
+  #                             {@execution_status.completed_steps}/{@execution_status.total_steps} steps
+  #                           </div>
+  #                         </div>
+  #                         <!-- Progress bar -->
+  #                         <%= if @execution_status.total_steps > 0 do %>
+  #                           <div class="mt-2">
+  #                             <div class="w-full bg-base-300 rounded-full h-1.5">
+  #                               <div
+  #                                 class={[
+  #                                   "h-1.5 rounded-full transition-all duration-300",
+  #                                   case @execution_status.status do
+  #                                     :completed -> "bg-success"
+  #                                     :failed -> "bg-error"
+  #                                     :running -> "bg-warning"
+  #                                     _ -> "bg-primary"
+  #                                   end
+  #                                 ]}
+  #                                 style={"width: #{min(100, round(@execution_status.completed_steps / @execution_status.total_steps * 100))}%"}
+  #                               >
+  #                               </div>
+  #                             </div>
+  #                           </div>
+  #                         <% end %>
+  #                         <!-- Execution timing -->
+  #                         <%= if @execution_status.started_at do %>
+  #                           <div class="mt-1 text-xs text-base-content/50">
+  #                             <%= if @execution_status.completed_at do %>
+  #                               Completed in {calculate_execution_duration(@execution_status)}
+  #                             <% else %>
+  #                               Started {format_relative_time(@execution_status.started_at)}
+  #                             <% end %>
+  #                           </div>
+  #                         <% end %>
+  #                       </div>
+  #                     <% end %>
+  #                     <!-- SSE Connection Status -->
+  #                     <%= if @streaming do %>
+  #                       <div class="border-t border-base-300 px-4 py-1 bg-info/10">
+  #                         <div class="flex items-center gap-2 text-xs text-info">
+  #                           <div class="w-2 h-2 bg-info rounded-full animate-pulse"></div>
+  #                           <span>Connected to agent stream</span>
+  #                         </div>
+  #                       </div>
+  #                     <% end %>
+  #                     <!-- Message Input -->
+  #                     <div class="border-t border-base-300 p-4">
+  #                       <form phx-submit="send_chat_message" class="flex gap-2">
+  #                         <input
+  #                           type="text"
+  #                           name="message"
+  #                           placeholder="Type your test message..."
+  #                           class="input input-bordered flex-1"
+  #                           disabled={@streaming || !@selected_agent_id}
+  #                         />
+  #                         <button
+  #                           type="submit"
+  #                           class="btn btn-primary"
+  #                           disabled={@streaming || !@selected_agent_id}
+  #                         >
+  #                           {if @streaming, do: "Sending...", else: "Send"}
+  #                         </button>
+  #                       </form>
+  #                       <!-- Error Display with Recovery Options -->
+  #                       <%= if @error_info do %>
+  #                         <.live_component
+  #                           module={AgentWebWeb.ErrorDisplayComponent}
+  #                           id="chat-error"
+  #                           error={@error_info.message}
+  #                           error_type={@error_info.type}
+  #                           context={@error_info.context}
+  #                           recovery_actions={@error_info.recovery_actions}
+  #                           dismissible={true}
+  #                           class="mt-2"
+  #                         />
+  #                       <% end %>
+  #                     </div>
+  #                   </div>
+  #                 </div>
+  #               </div>
+  #             </div>
+  #           <% end %>
+  #         </div>
+  #       </div>
+  #     </Layouts.app>
+  #   </div>
+  #   """
+  # end
 
   # Handle form submission for chat messages
   @impl true
@@ -801,6 +863,27 @@ defmodule AgentWebWeb.AgentTestingLive do
   defp generate_conversation_id(agent_id) do
     timestamp = DateTime.utc_now() |> DateTime.to_unix()
     "chat_#{agent_id}_#{timestamp}"
+  end
+
+  # Add empty_state component helper
+  attr :title, :string, required: true
+  attr :message, :string, required: true
+  attr :icon, :string, required: true
+  slot :actions
+
+  defp empty_state(assigns) do
+    ~H"""
+    <div class="flex flex-col items-center justify-center py-12 text-center">
+      <.icon name={@icon} class="size-12 text-base-content/30 mb-4" />
+      <h3 class="text-lg font-semibold text-base-content/70 mb-2">{@title}</h3>
+      <p class="text-sm text-base-content/50 max-w-md mb-4">{@message}</p>
+      <%= if @actions != [] do %>
+        <div class="flex gap-2">
+          {render_slot(@actions)}
+        </div>
+      <% end %>
+    </div>
+    """
   end
 
   defp build_conversation_context(messages) do
@@ -840,9 +923,9 @@ defmodule AgentWebWeb.AgentTestingLive do
     end
   end
 
-  # defp format_user_error(err) do
-  #   ErrorHandler.format_user_error(err)
-  # end
+  defp format_user_error(err) do
+    ErrorHandler.format_user_error(err)
+  end
 
   defp is_recoverable_error(err) do
     case err do
@@ -866,17 +949,17 @@ defmodule AgentWebWeb.AgentTestingLive do
     |> Enum.take(-3)
   end
 
-  # defp build_conversation_history(existing_messages, new_message, _context) do
-  #   # Convert existing messages to the format expected by the agent
-  #   history_messages =
-  #     existing_messages
-  #     |> Enum.map(fn msg ->
-  #       %{"role" => msg["role"], "content" => msg["content"]}
-  #     end)
+  defp build_conversation_history(existing_messages, new_message, _context) do
+    # Convert existing messages to the format expected by the agent
+    history_messages =
+      existing_messages
+      |> Enum.map(fn msg ->
+        %{"role" => msg["role"], "content" => msg["content"]}
+      end)
 
-  #   # Add the new user message
-  #   history_messages ++ [%{"role" => "user", "content" => new_message}]
-  # end
+    # Add the new user message
+    history_messages ++ [%{"role" => "user", "content" => new_message}]
+  end
 
   defp update_execution_status(socket, status, step_name \\ nil) do
     current_status = socket.assigns.execution_status
@@ -1000,6 +1083,71 @@ defmodule AgentWebWeb.AgentTestingLive do
     update_workflow_node_status(socket, step_id, :failed, %{error: error})
   end
 
+  defp update_workflow_progress(socket, step_name, status, step_id, execution_time_ms, error) do
+    Logger.info("workflow.step_execution", %{
+      step_id: step_id,
+      step_name: step_name,
+      status: status,
+      execution_time_ms: execution_time_ms,
+      has_error: not is_nil(error),
+      error: error
+    })
+
+    socket =
+      case status do
+        "starting" ->
+          socket
+          |> assign(:current_step_id, step_id)
+          |> update_workflow_node_status(step_id, :running)
+          |> update_execution_status(:running, step_name)
+
+        "completed" ->
+          metadata = if execution_time_ms, do: %{execution_time_ms: execution_time_ms}, else: %{}
+
+          socket
+          |> assign(:current_step_id, nil)
+          |> update_workflow_node_status(step_id, :completed, metadata)
+          |> increment_completed_steps()
+
+        "failed" ->
+          metadata = if error, do: %{error: error}, else: %{}
+
+          socket
+          |> assign(:current_step_id, nil)
+          |> update_workflow_node_status(step_id, :failed, metadata)
+          |> update_execution_status(:failed)
+
+        "skipped" ->
+          socket
+          |> assign(:current_step_id, nil)
+          |> update_workflow_node_status(step_id, :skipped)
+          |> increment_completed_steps()
+
+        _ ->
+          socket
+      end
+
+    broadcast_workflow_update(socket, :step_execution, step_id, %{
+      step_name: step_name,
+      status: status,
+      execution_time_ms: execution_time_ms,
+      error: error
+    })
+  end
+
+  defp maybe_update_execution_status(socket, status, step_name) do
+    case status do
+      "starting" ->
+        update_execution_status(socket, :running, step_name)
+
+      "failed" ->
+        update_execution_status(socket, :failed)
+
+      _ ->
+        socket
+    end
+  end
+
   defp calculate_execution_duration(execution_status) do
     if execution_status.started_at && execution_status.completed_at do
       duration_ms =
@@ -1037,6 +1185,8 @@ defmodule AgentWebWeb.AgentTestingLive do
   end
 
   defp create_assistant_message(content, metadata) do
+    # Create assistant message with clean LLM response content only
+    # Content should not contain any workflow progress indicators or step execution status
     base_message = %{
       "id" => generate_message_id(),
       "role" => "assistant",

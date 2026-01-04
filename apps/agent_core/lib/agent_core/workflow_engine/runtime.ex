@@ -252,10 +252,9 @@ defmodule AgentCore.WorkflowEngine.Runtime do
   defp execute_single_node(spec, ctx, input, node_id) do
     start_time = System.monotonic_time(:millisecond)
 
-    # Send step start notification if streaming callback is available
-    if on_chunk = Map.get(input, :on_chunk) do
-      step_name = format_step_name(node_id)
-      on_chunk.("🔄 Starting: #{step_name}")
+    # Send structured step execution event if workflow progress callback is available
+    if on_workflow_progress = Map.get(input, :on_workflow_progress) do
+      on_workflow_progress.(node_id, :start, %{})
     end
 
     case Map.get(spec.nodes, node_id) do
@@ -269,10 +268,9 @@ defmodule AgentCore.WorkflowEngine.Runtime do
             {:ok, updated_ctx, output} ->
               duration = System.monotonic_time(:millisecond) - start_time
 
-              # Send step completion notification if streaming callback is available
-              if on_chunk = Map.get(input, :on_chunk) do
-                step_name = format_step_name(node_id)
-                on_chunk.("✅ Completed: #{step_name} (#{duration}ms)")
+              # Send structured step execution event if workflow progress callback is available
+              if on_workflow_progress = Map.get(input, :on_workflow_progress) do
+                on_workflow_progress.(node_id, :complete, %{duration_ms: duration})
               end
 
               trace_entry =
@@ -283,10 +281,9 @@ defmodule AgentCore.WorkflowEngine.Runtime do
             {:skip, updated_ctx, output} ->
               duration = System.monotonic_time(:millisecond) - start_time
 
-              # Send step skip notification if streaming callback is available
-              if on_chunk = Map.get(input, :on_chunk) do
-                step_name = format_step_name(node_id)
-                on_chunk.("⏭️ Skipped: #{step_name} (#{duration}ms)")
+              # Send structured step execution event if workflow progress callback is available
+              if on_workflow_progress = Map.get(input, :on_workflow_progress) do
+                on_workflow_progress.(node_id, :skip, %{duration_ms: duration})
               end
 
               trace_entry =
@@ -297,10 +294,9 @@ defmodule AgentCore.WorkflowEngine.Runtime do
             {:error, updated_ctx, error} ->
               duration = System.monotonic_time(:millisecond) - start_time
 
-              # Send step error notification if streaming callback is available
-              if on_chunk = Map.get(input, :on_chunk) do
-                step_name = format_step_name(node_id)
-                on_chunk.("❌ Failed: #{step_name} (#{duration}ms)")
+              # Send structured step execution event if workflow progress callback is available
+              if on_workflow_progress = Map.get(input, :on_workflow_progress) do
+                on_workflow_progress.(node_id, :error, %{duration_ms: duration, error: error})
               end
 
               trace_entry =
@@ -311,12 +307,6 @@ defmodule AgentCore.WorkflowEngine.Runtime do
             other ->
               duration = System.monotonic_time(:millisecond) - start_time
               error = %{type: :invalid_step_return, node: node_id, returned: other}
-
-              # Send step error notification if streaming callback is available
-              if on_chunk = Map.get(input, :on_chunk) do
-                step_name = format_step_name(node_id)
-                on_chunk.("❌ Invalid return: #{step_name} (#{duration}ms)")
-              end
 
               trace_entry =
                 create_trace_entry(node_id, step_module, :error, duration, input, %{}, error)
@@ -332,12 +322,6 @@ defmodule AgentCore.WorkflowEngine.Runtime do
               node: node_id,
               exception: Exception.message(exception)
             }
-
-            # Send step exception notification if streaming callback is available
-            if on_chunk = Map.get(input, :on_chunk) do
-              step_name = format_step_name(node_id)
-              on_chunk.("💥 Exception: #{step_name} - #{Exception.message(exception)}")
-            end
 
             trace_entry =
               create_trace_entry(node_id, step_module, :error, duration, input, %{}, error)
@@ -431,14 +415,5 @@ defmodule AgentCore.WorkflowEngine.Runtime do
 
   defp generate_trace_id do
     :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
-  end
-
-  defp format_step_name(node_id) do
-    node_id
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.split()
-    |> Enum.map(&String.capitalize/1)
-    |> Enum.join(" ")
   end
 end

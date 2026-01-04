@@ -20,7 +20,11 @@ defmodule AgentWebWeb.AdminLayouts do
   - Fixed footer at bottom (always visible)
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
-  attr :current_page, :atom, default: :dashboard, doc: "the current admin page for navigation state"
+
+  attr :current_page, :atom,
+    default: :dashboard,
+    doc: "the current admin page for navigation state"
+
   attr :current_section, :atom, default: :analytics, doc: "the current admin section"
   attr :sidebar_collapsed, :boolean, default: false, doc: "whether the sidebar is collapsed"
   attr :loading, :boolean, default: false, doc: "whether the page is in loading state"
@@ -42,11 +46,11 @@ defmodule AgentWebWeb.AdminLayouts do
         <a href="#admin-sidebar" class="skip-link">Skip to navigation</a>
         <a href="#admin-footer" class="skip-link">Skip to footer</a>
       </div>
-
-      <!-- Admin Navigation Bar - Fixed at top -->
+      
+    <!-- Admin Navigation Bar - Fixed at top -->
       <.admin_navbar loading={@loading} />
-
-      <!-- Main Layout Grid - Flexible space between navbar and footer -->
+      
+    <!-- Main Layout Grid - Flexible space between navbar and footer -->
       <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar LiveComponent -->
         <.live_component
@@ -56,16 +60,16 @@ defmodule AgentWebWeb.AdminLayouts do
           collapsed={@sidebar_collapsed}
           is_mobile={@is_mobile?}
         />
-
-        <!-- Main Content Area - Scrollable -->
+        
+    <!-- Main Content Area - Scrollable -->
         <main
           id="main-content"
-          class="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-8"
+          class="flex-1 min-h-0 overflow-hidden p-4 lg:p-6 xl:p-8"
           role="main"
           aria-label="Admin dashboard main content"
           tabindex="-1"
         >
-          <div class="max-w-7xl mx-auto">
+          <div class="max-w-7xl mx-auto h-full flex flex-col min-h-0">
             <!-- Page-level Error State -->
             <div :if={@error && !@loading} class="mb-6">
               <.error_state
@@ -75,30 +79,30 @@ defmodule AgentWebWeb.AdminLayouts do
                 class="bg-base-200 rounded-lg"
               />
             </div>
-
-            <!-- Page-level Loading State -->
+            
+    <!-- Page-level Loading State -->
             <div :if={@loading} class="mb-6" {loading_attrs("page-loading")}>
               <.loading_state
                 message="Loading admin dashboard..."
                 class="bg-base-200 rounded-lg"
               />
             </div>
-
-            <!-- Page Content -->
-            <div :if={!@error && !@loading}>
+            
+    <!-- Page Content -->
+            <div :if={!@error && !@loading} class="flex-1 min-h-0 flex flex-col">
               {render_slot(@inner_block)}
             </div>
           </div>
         </main>
       </div>
-
-      <!-- Admin Footer - Fixed at bottom -->
+      
+    <!-- Admin Footer - Fixed at bottom -->
       <.admin_footer />
-
-      <!-- Enhanced Flash Messages -->
+      
+    <!-- Enhanced Flash Messages -->
       <.admin_flash_group flash={@flash} />
-
-      <!-- Screen Reader Announcements -->
+      
+    <!-- Screen Reader Announcements -->
       <div
         id="screen-reader-announcements"
         aria-live="polite"
@@ -187,8 +191,8 @@ defmodule AgentWebWeb.AdminLayouts do
     <div id={@id} class="fixed top-20 right-4 z-50 space-y-2" aria-live="polite">
       <.admin_flash kind={:info} flash={@flash} />
       <.admin_flash kind={:error} flash={@flash} />
-
-      <!-- Connection Status Messages -->
+      
+    <!-- Connection Status Messages -->
       <.admin_flash
         id="admin-client-error"
         kind={:error}

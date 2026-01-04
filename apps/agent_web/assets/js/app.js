@@ -254,6 +254,16 @@ const Hooks = {
 
         if (evt.type === "token") {
           this.pushEvent("sse_token", { token: evt.token })
+        } else if (evt.type === "step_execution") {
+          // NEW: Handle step execution events
+          this.pushEvent("sse_step_execution", {
+            step_name: evt.step_name,
+            status: evt.status,
+            timestamp: evt.timestamp,
+            execution_time_ms: evt.execution_time_ms,
+            error: evt.error,
+            step_id: evt.step_id
+          })
         } else if (evt.type === "done") {
           this.doneReceived = true
           const meta = evt.meta && Object.keys(evt.meta).length > 0 ? evt.meta : { done: true }
@@ -271,6 +281,10 @@ const Hooks = {
         } else if (evt.type === "ping") {
           // Server keepalive - ignore silently
           console.debug("SSE ping received")
+        } else if (evt.type === "close") {
+          // Stream close event - clean termination
+          console.debug("SSE close received")
+          this.doneReceived = true
         }
       }
     },
@@ -279,6 +293,7 @@ const Hooks = {
       // frame is multiple lines: "event: x\n" and/or "data: y\n"
       // We support:
       // - event: token, data: {"token":"..."}
+      // - event: step_execution, data: {"step_name":"...", "status":"...", "timestamp":..., ...}
       // - event: done,  data: {"run_id":"...", "trace_id":"...", ...}
       // - event: clarify, data: {"trace_id":"...", "question":"..."}
       // - event: error, data: {"error":{...}}
@@ -311,6 +326,15 @@ const Hooks = {
       if (!eventName) {
         const maybe = this._safeJson(dataStr)
         if (maybe?.token != null) return { type: "token", token: String(maybe.token) }
+        if (maybe?.step_name != null && maybe?.status != null) return { 
+          type: "step_execution", 
+          step_name: maybe.step_name,
+          status: maybe.status,
+          timestamp: maybe.timestamp,
+          execution_time_ms: maybe.execution_time_ms,
+          error: maybe.error,
+          step_id: maybe.step_id
+        }
         if (maybe?.run_id != null) return { type: "done", meta: maybe }
         if (maybe?.question != null) return { type: "clarify", trace_id: maybe.trace_id, question: maybe.question }
         if (maybe?.error != null) return { type: "error", error: maybe.error }
@@ -321,6 +345,21 @@ const Hooks = {
         const obj = this._safeJson(dataStr)
         if (!obj || obj.token == null) return null
         return { type: "token", token: String(obj.token) }
+      }
+
+      if (eventName === "step_execution") {
+        // NEW: Parse step execution event
+        const obj = this._safeJson(dataStr)
+        if (!obj || !obj.step_name || !obj.status) return null
+        return {
+          type: "step_execution",
+          step_name: obj.step_name,
+          status: obj.status,
+          timestamp: obj.timestamp,
+          execution_time_ms: obj.execution_time_ms,
+          error: obj.error,
+          step_id: obj.step_id
+        }
       }
 
       if (eventName === "done") {
@@ -348,6 +387,11 @@ const Hooks = {
       if (eventName === "ping") {
         // Server keepalive
         return { type: "ping" }
+      }
+
+      if (eventName === "close") {
+        // Stream close event
+        return { type: "close" }
       }
 
       if (eventName === "open") {

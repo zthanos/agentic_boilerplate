@@ -901,7 +901,7 @@ defmodule AgentWebWeb.AdminChatLive do
           </div>
 
           <div class="text-sm text-base-content/70 mt-1">
-            <span :if={@service.port}>Port: {@service.port}    • </span>
+            <span :if={@service.port}>Port: {@service.port}     • </span>
             Last restart: {@service.last_restart}
           </div>
 

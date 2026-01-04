@@ -84,7 +84,6 @@ defmodule AgentRuntime.Providers.Client do
     end
   end
 
-
   # Private helper functions
 
   defp get_provider_module(provider) do
