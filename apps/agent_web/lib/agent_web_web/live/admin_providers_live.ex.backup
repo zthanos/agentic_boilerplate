@@ -1,0 +1,4204 @@
+defmodule AgentWebWeb.AdminProvidersLive do
+  @moduledoc """
+  Admin providers management LiveView for service provider management.
+  Provides interface for provider CRUD operations, connection testing, and health monitoring.
+  """
+  use AgentWebWeb, :live_view
+  alias AgentWebWeb.AdminLayouts
+  alias AgentWeb.Providers
+
+  @impl true
+  def mount(_params, _session, socket) do
+    if connected?(socket) do
+      # Subscribe to provider-related events
+      Phoenix.PubSub.subscribe(AgentWeb.PubSub, "admin:providers")
+    end
+
+    {:ok,
+     socket
+     |> assign(:current_page, :providers)
+     |> assign(:current_section, :management)
+     |> assign(:sidebar_collapsed, false)
+     |> assign(:page_title, "Service Providers")
+     |> assign(:view_mode, :list)
+     |> assign(:selected_provider, nil)
+     |> assign(:search_query, "")
+     |> assign(:type_filter, "all")
+     |> assign(:status_filter, "all")
+     |> assign(:enabled_filter, "all")
+     |> assign(:group_by_type, false)
+     |> assign(:selected_providers, [])
+     |> assign(:show_bulk_actions, false)
+     # Enhanced error handling and UX state
+     |> assign(:loading, false)
+     |> assign(:saving, false)
+     |> assign(:deleting, false)
+     |> assign(:testing_connection, false)
+     |> assign(:testing_authentication, false)
+     |> assign(:form_errors, %{})
+     |> assign(:validation_errors, %{})
+     |> assign(:auth_validation_errors, %{})
+     |> assign(:auth_validation_status, nil)
+     |> assign(:last_operation, nil)
+     |> assign(:operation_status, nil)
+     |> assign(:connection_test_result, nil)
+     |> assign(:auth_test_result, nil)
+     |> assign(:testing_all_connections, false)
+     |> assign(:bulk_test_results, [])
+     # Health monitoring state
+     |> assign(:performing_health_check, false)
+     |> assign(:performing_bulk_health_check, false)
+     |> assign(:bulk_health_results, [])
+     |> assign(:selected_health_metrics, nil)
+     |> assign(:health_metrics_loading, false)
+     |> assign(:aggregated_health_metrics, nil)
+     # Analytics and statistics state
+     |> assign(:provider_analytics, nil)
+     |> assign(:analytics_loading, false)
+     |> assign(:show_analytics_dashboard, false)
+     |> assign(:analytics_view_mode, :overview)
+     |> load_providers_data()
+     |> load_health_metrics()}
+  end
+
+  @impl true
+  def handle_event("toggle_sidebar", _params, socket) do
+    new_state = !socket.assigns.sidebar_collapsed
+    {:noreply, assign(socket, :sidebar_collapsed, new_state)}
+  end
+
+  @impl true
+  def handle_event("set_sidebar_state", %{"collapsed" => collapsed}, socket) do
+    {:noreply, assign(socket, :sidebar_collapsed, collapsed)}
+  end
+
+  @impl true
+  def handle_event("search_providers", %{"search" => query}, socket) do
+    {:noreply,
+     socket
+     |> assign(:search_query, query)
+     |> filter_providers()}
+  end
+
+  @impl true
+  def handle_event("filter_by_type", %{"type" => type}, socket) do
+    {:noreply,
+     socket
+     |> assign(:type_filter, type)
+     |> filter_providers()}
+  end
+
+  @impl true
+  def handle_event("clear_filters", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:search_query, "")
+     |> assign(:type_filter, "all")
+     |> assign(:status_filter, "all")
+     |> assign(:enabled_filter, "all")
+     |> filter_providers()}
+  end
+
+  @impl true
+  def handle_event("filter_by_enabled", %{"enabled" => enabled}, socket) do
+    {:noreply,
+     socket
+     |> assign(:enabled_filter, enabled)
+     |> filter_providers()}
+  end
+
+  @impl true
+  def handle_event("toggle_grouping", _params, socket) do
+    new_grouping = !Map.get(socket.assigns, :group_by_type, false)
+    {:noreply,
+     socket
+     |> assign(:group_by_type, new_grouping)
+     |> filter_providers()}
+  end
+
+  @impl true
+  def handle_event("provider_type_changed", %{"provider" => %{"type" => type}}, socket) do
+    # Handle provider type change to show/hide type-specific fields
+    updated_provider =
+      socket.assigns.selected_provider
+      |> Map.put(:type, convert_string_to_provider_type(type))
+
+    {:noreply,
+     socket
+     |> assign(:selected_provider, updated_provider)
+     |> assign(:form_errors, %{})
+     |> assign(:validation_errors, %{})}
+  end
+
+  @impl true
+  def handle_event("filter_by_status", %{"status" => status}, socket) do
+    {:noreply,
+     socket
+     |> assign(:status_filter, status)
+     |> filter_providers()}
+  end
+
+  @impl true
+  def handle_event("view_provider", %{"provider_id" => provider_id}, socket) do
+    provider = Enum.find(socket.assigns.all_providers, &(&1.id == provider_id))
+
+    {:noreply,
+     socket
+     |> assign(:selected_provider, provider)
+     |> assign(:view_mode, :detail)}
+  end
+
+  @impl true
+  def handle_event("edit_provider", %{"provider_id" => provider_id}, socket) do
+    provider = Enum.find(socket.assigns.all_providers, &(&1.id == provider_id))
+
+    {:noreply,
+     socket
+     |> assign(:selected_provider, provider)
+     |> assign(:view_mode, :edit)
+     |> assign(:form_errors, %{})
+     |> assign(:validation_errors, %{})
+     |> assign(:saving, false)}
+  end
+
+  @impl true
+  def handle_event("create_provider", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:selected_provider, get_empty_provider())
+     |> assign(:view_mode, :create)
+     |> assign(:form_errors, %{})
+     |> assign(:validation_errors, %{})
+     |> assign(:saving, false)}
+  end
+
+  @impl true
+  def handle_event("back_to_list", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:view_mode, :list)
+     |> assign(:selected_provider, nil)
+     |> assign(:form_errors, %{})
+     |> assign(:validation_errors, %{})
+     |> assign(:saving, false)
+     |> assign(:deleting, false)
+     |> assign(:connection_test_result, nil)}
+  end
+
+  @impl true
+  def handle_event("validate_provider", %{"provider" => provider_params}, socket) do
+    # Real-time form validation without saving
+    case validate_form_params(provider_params) do
+      {:ok, _attrs} ->
+        {:noreply,
+         socket
+         |> assign(:form_errors, %{})
+         |> assign(:validation_errors, %{})}
+
+      {:error, validation_errors} when is_list(validation_errors) ->
+        # Convert list of errors to field-specific map
+        error_map = build_error_map(validation_errors)
+
+        {:noreply,
+         socket
+         |> assign(:form_errors, error_map)
+         |> assign(:validation_errors, error_map)}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:form_errors, %{general: reason})
+         |> assign(:validation_errors, %{general: reason})}
+    end
+  end
+
+  @impl true
+  def handle_event("save_provider", %{"provider" => provider_params}, socket) do
+    # Set loading state immediately
+    socket = assign(socket, :saving, true)
+
+    # Attempt to save the provider using the context module
+    result =
+      case socket.assigns.view_mode do
+        :create ->
+          Providers.create_provider(provider_params)
+
+        :edit ->
+          provider_id = socket.assigns.selected_provider.id
+          Providers.update_provider(provider_id, provider_params)
+      end
+
+    case result do
+      {:ok, _provider_id} when socket.assigns.view_mode == :create ->
+        {:noreply,
+         socket
+         |> assign(:view_mode, :list)
+         |> assign(:selected_provider, nil)
+         |> assign(:saving, false)
+         |> assign(:form_errors, %{})
+         |> assign(:validation_errors, %{})
+         |> assign(:last_operation, "create")
+         |> assign(:operation_status, :success)
+         |> put_flash(:info, build_success_message("created", provider_params["name"]))
+         |> load_providers_data()}
+
+      {:ok, _provider} when socket.assigns.view_mode == :edit ->
+        {:noreply,
+         socket
+         |> assign(:view_mode, :list)
+         |> assign(:selected_provider, nil)
+         |> assign(:saving, false)
+         |> assign(:form_errors, %{})
+         |> assign(:validation_errors, %{})
+         |> assign(:last_operation, "update")
+         |> assign(:operation_status, :success)
+         |> put_flash(:info, build_success_message("updated", provider_params["name"]))
+         |> load_providers_data()}
+
+      {:error, reason} when is_binary(reason) ->
+        {:noreply,
+         socket
+         |> assign(:saving, false)
+         |> assign(:last_operation, "save")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, build_error_message("save", reason))}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:saving, false)
+         |> assign(:last_operation, "save")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, build_error_message("save", inspect(reason)))}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_provider", %{"provider_id" => provider_id}, socket) do
+    # Set deleting state
+    socket = assign(socket, :deleting, true)
+
+    # Get provider name for better error messages
+    provider = Enum.find(socket.assigns.all_providers, &(&1.id == provider_id))
+    provider_name = if provider, do: provider.name, else: "Unknown Provider"
+
+    case Providers.delete_provider(provider_id) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(:deleting, false)
+         |> assign(:last_operation, "delete")
+         |> assign(:operation_status, :success)
+         |> put_flash(:info, build_success_message("deleted", provider_name))
+         |> load_providers_data()}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:deleting, false)
+         |> assign(:last_operation, "delete")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, build_error_message("delete", reason, provider_name))}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_status", %{"provider_id" => provider_id}, socket) do
+    # Get provider for better messages
+    provider = Enum.find(socket.assigns.all_providers, &(&1.id == provider_id))
+    provider_name = if provider, do: provider.name, else: "Unknown Provider"
+    new_status = !provider.enabled
+
+    case Providers.set_provider_enabled(provider_id, new_status) do
+      {:ok, _updated_provider} ->
+        status = if new_status, do: "enabled", else: "disabled"
+
+        {:noreply,
+         socket
+         |> assign(:last_operation, "toggle_status")
+         |> assign(:operation_status, :success)
+         |> put_flash(:info, build_success_message(status, provider_name))
+         |> load_providers_data()}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:last_operation, "toggle_status")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, build_error_message("toggle status", reason, provider_name))}
+    end
+  end
+
+  @impl true
+  def handle_event("test_connection", %{"provider_id" => provider_id}, socket) do
+    # Set testing state
+    socket = assign(socket, :testing_connection, true)
+
+    case Providers.test_provider_connection(provider_id) do
+      {:ok, test_result} ->
+        # Determine flash message based on overall test status
+        {flash_type, flash_message} =
+          case test_result.overall_status do
+            :success ->
+              {:info,
+               "Connection test successful! All tests passed in #{test_result.response_time_ms}ms"}
+
+            :warning ->
+              {:warning, "Connection test completed with warnings. Some issues detected."}
+
+            _ ->
+              {:error, "Connection test failed. Check the results for details."}
+          end
+
+        {:noreply,
+         socket
+         |> assign(:testing_connection, false)
+         |> assign(:connection_test_result, test_result)
+         |> assign(:last_operation, "test_connection")
+         |> assign(:operation_status, test_result.overall_status)
+         |> put_flash(flash_type, flash_message)}
+
+      {:error, reason} ->
+        error_result = %{
+          overall_status: :error,
+          error_details: [reason],
+          troubleshooting_hints: ["Check provider configuration and network connectivity"],
+          response_time_ms: nil,
+          tests: %{}
+        }
+
+        {:noreply,
+         socket
+         |> assign(:testing_connection, false)
+         |> assign(:connection_test_result, error_result)
+         |> assign(:last_operation, "test_connection")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, "Connection test failed: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_event("test_authentication", %{"provider_id" => provider_id}, socket) do
+    # Set testing state
+    socket = assign(socket, :testing_authentication, true)
+
+    case Providers.test_provider_authentication(provider_id) do
+      {:ok, %{status: :success, message: message}} ->
+        {:noreply,
+         socket
+         |> assign(:testing_authentication, false)
+         |> assign(:auth_test_result, %{status: :success, message: message})
+         |> assign(:last_operation, "test_authentication")
+         |> assign(:operation_status, :success)
+         |> put_flash(:info, "Authentication test successful: #{message}")}
+
+      {:ok, %{status: :no_auth, message: message}} ->
+        {:noreply,
+         socket
+         |> assign(:testing_authentication, false)
+         |> assign(:auth_test_result, %{status: :info, message: message})
+         |> assign(:last_operation, "test_authentication")
+         |> assign(:operation_status, :success)
+         |> put_flash(:info, message)}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:testing_authentication, false)
+         |> assign(:auth_test_result, %{status: :error, message: reason})
+         |> assign(:last_operation, "test_authentication")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, "Authentication test failed: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_event("test_all_connections", _params, socket) do
+    # Set testing state for all providers
+    socket = assign(socket, :testing_all_connections, true)
+
+    # Get all enabled providers
+    enabled_providers = Enum.filter(socket.assigns.all_providers, & &1.enabled)
+
+    if Enum.empty?(enabled_providers) do
+      {:noreply,
+       socket
+       |> assign(:testing_all_connections, false)
+       |> put_flash(:warning, "No enabled providers to test")}
+    else
+      # Start async testing of all providers
+      test_results = test_multiple_providers_async(enabled_providers)
+
+      # Count results
+      successful_tests =
+        Enum.count(test_results, fn {_id, result} ->
+          match?({:ok, %{overall_status: :success}}, result)
+        end)
+
+      total_tests = length(test_results)
+
+      {:noreply,
+       socket
+       |> assign(:testing_all_connections, false)
+       |> assign(:bulk_test_results, test_results)
+       |> assign(:last_operation, "test_all_connections")
+       |> assign(
+         :operation_status,
+         if(successful_tests == total_tests, do: :success, else: :warning)
+       )
+       |> put_flash(
+         :info,
+         "Bulk connection test completed: #{successful_tests}/#{total_tests} providers successful"
+       )
+       |> load_providers_data()}
+    end
+  end
+
+  @impl true
+  def handle_event("perform_health_check", %{"provider_id" => provider_id}, socket) do
+    # Set health check state
+    socket = assign(socket, :performing_health_check, true)
+
+    case Providers.perform_health_check(provider_id) do
+      {:ok, health_result} ->
+        # Get provider name for better messages
+        provider = Enum.find(socket.assigns.all_providers, &(&1.id == provider_id))
+        provider_name = if provider, do: provider.name, else: "Unknown Provider"
+
+        {flash_type, flash_message} =
+          case health_result.status do
+            :online ->
+              {:info, "Health check successful for '#{provider_name}' - Provider is online"}
+
+            :degraded ->
+              {:warning, "Health check completed for '#{provider_name}' - Provider is degraded"}
+
+            :offline ->
+              {:error, "Health check failed for '#{provider_name}' - Provider is offline"}
+
+            _ ->
+              {:warning, "Health check completed for '#{provider_name}' - Status unknown"}
+          end
+
+        {:noreply,
+         socket
+         |> assign(:performing_health_check, false)
+         |> assign(:last_operation, "health_check")
+         |> assign(:operation_status, health_result.status)
+         |> put_flash(flash_type, flash_message)
+         |> load_providers_data()}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:performing_health_check, false)
+         |> assign(:last_operation, "health_check")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, "Health check failed: #{reason}")
+         |> load_providers_data()}
+    end
+  end
+
+  @impl true
+  def handle_event("perform_bulk_health_check", _params, socket) do
+    # Set bulk health check state
+    socket = assign(socket, :performing_bulk_health_check, true)
+
+    case Providers.perform_bulk_health_check() do
+      {:ok, health_results} ->
+        # Count results
+        successful_checks =
+          Enum.count(health_results, fn {_id, result} ->
+            match?({:ok, %{status: :online}}, result)
+          end)
+
+        total_checks = length(health_results)
+
+        {:noreply,
+         socket
+         |> assign(:performing_bulk_health_check, false)
+         |> assign(:bulk_health_results, health_results)
+         |> assign(:last_operation, "bulk_health_check")
+         |> assign(
+           :operation_status,
+           if(successful_checks == total_checks, do: :success, else: :warning)
+         )
+         |> put_flash(
+           :info,
+           "Bulk health check completed: #{successful_checks}/#{total_checks} providers online"
+         )
+         |> load_providers_data()}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:performing_bulk_health_check, false)
+         |> assign(:last_operation, "bulk_health_check")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, "Bulk health check failed: #{reason}")
+         |> load_providers_data()}
+    end
+  end
+
+  @impl true
+  def handle_event(
+        "update_health_status",
+        %{"provider_id" => provider_id, "status" => status},
+        socket
+      ) do
+    # Manual health status update
+    health_status = String.to_existing_atom(status)
+
+    case Providers.update_provider_health_status(provider_id, health_status) do
+      {:ok, _updated_provider} ->
+        provider = Enum.find(socket.assigns.all_providers, &(&1.id == provider_id))
+        provider_name = if provider, do: provider.name, else: "Unknown Provider"
+
+        {:noreply,
+         socket
+         |> assign(:last_operation, "update_health_status")
+         |> assign(:operation_status, :success)
+         |> put_flash(:info, "Health status updated for '#{provider_name}' to #{status}")
+         |> load_providers_data()}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:last_operation, "update_health_status")
+         |> assign(:operation_status, :error)
+         |> put_flash(:error, "Failed to update health status: #{reason}")
+         |> load_providers_data()}
+    end
+  end
+
+  @impl true
+  def handle_event("view_health_metrics", %{"provider_id" => provider_id}, socket) do
+    case Providers.get_provider_health_metrics(provider_id) do
+      {:ok, health_metrics} ->
+        {:noreply,
+         socket
+         |> assign(:selected_health_metrics, health_metrics)
+         |> assign(:view_mode, :health_metrics)}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Failed to load health metrics: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_event("validate_authentication", %{"provider" => provider_params}, socket) do
+    # Real-time authentication validation
+    case Providers.validate_authentication_config(provider_params) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(:auth_validation_errors, %{})
+         |> assign(:auth_validation_status, :valid)}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:auth_validation_errors, %{general: reason})
+         |> assign(:auth_validation_status, :invalid)}
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_analytics_dashboard", _params, socket) do
+    new_state = !socket.assigns.show_analytics_dashboard
+    {:noreply, assign(socket, :show_analytics_dashboard, new_state)}
+  end
+
+  @impl true
+  def handle_event("set_analytics_view", %{"view" => view}, socket) do
+    view_atom = String.to_existing_atom(view)
+    {:noreply, assign(socket, :analytics_view_mode, view_atom)}
+  rescue
+    ArgumentError ->
+      {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("refresh_analytics", _params, socket) do
+    socket = assign(socket, :analytics_loading, true)
+
+    case Providers.get_provider_analytics() do
+      {:ok, analytics} ->
+        {:noreply,
+         socket
+         |> assign(:provider_analytics, analytics)
+         |> assign(:analytics_loading, false)
+         |> put_flash(:info, "Analytics refreshed successfully")}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:analytics_loading, false)
+         |> put_flash(:error, "Failed to refresh analytics: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_info({:toggle_sidebar}, socket) do
+    {:noreply, assign(socket, :sidebar_collapsed, !socket.assigns.sidebar_collapsed)}
+  end
+
+  @impl true
+  def handle_info({:close_mobile_sidebar}, socket) do
+    {:noreply, assign(socket, :sidebar_collapsed, true)}
+  end
+
+  @impl true
+  def render(assigns) do
+    assigns =
+      if is_nil(assigns[:available_provider_types]) do
+        assign(assigns, :available_provider_types, Providers.get_available_provider_types())
+      else
+        assigns
+      end
+
+    assigns =
+      if is_nil(assigns[:available_auth_types]) do
+        assign(assigns, :available_auth_types, Providers.get_available_auth_types())
+      else
+        assigns
+      end
+
+    ~H"""
+    <AdminLayouts.admin
+      flash={@flash}
+      current_page={@current_page}
+      current_section={@current_section}
+      sidebar_collapsed={@sidebar_collapsed}
+    >
+      <!-- Enhanced Flash Messages -->
+      <.enhanced_flash
+        flash={@flash}
+        last_operation={@last_operation}
+        operation_status={@operation_status}
+      />
+
+    <!-- Health Monitoring Dashboard -->
+      <div :if={@view_mode == :list && @aggregated_health_metrics} class="mb-6">
+        <.health_dashboard
+          metrics={@aggregated_health_metrics}
+          loading={@health_metrics_loading}
+          performing_bulk_health_check={@performing_bulk_health_check}
+        />
+      </div>
+
+      <!-- Analytics Dashboard -->
+      <div :if={@view_mode == :list && @show_analytics_dashboard && @provider_analytics} class="mb-6">
+        <.analytics_dashboard
+          analytics={@provider_analytics}
+          loading={@analytics_loading}
+          view_mode={@analytics_view_mode}
+        />
+      </div>
+
+    <!-- Header -->
+      <div class="mb-8">
+        <.header>
+          Service Providers
+          <:subtitle>
+            Manage AI service provider configurations, authentication, and monitoring
+          </:subtitle>
+
+          <:actions>
+            <div class="flex gap-2">
+              <button
+                :if={@view_mode == :list and length(@all_providers) > 0}
+                class={["btn btn-info btn-sm", @show_analytics_dashboard && "btn-active"]}
+                phx-click="toggle_analytics_dashboard"
+                title="Toggle analytics dashboard"
+              >
+                <.icon name="hero-chart-bar" class="size-4 mr-2" />
+                Analytics
+              </button>
+              <button
+                :if={@view_mode == :list and length(@all_providers) > 0}
+                class={["btn btn-success btn-sm", @performing_bulk_health_check && "loading"]}
+                phx-click="perform_bulk_health_check"
+                disabled={@performing_bulk_health_check}
+                title="Perform health check on all enabled providers"
+              >
+                <.icon :if={!@performing_bulk_health_check} name="hero-heart" class="size-4 mr-2" />
+                {if @performing_bulk_health_check, do: "Checking Health...", else: "Health Check All"}
+              </button>
+              <button
+                :if={@view_mode == :list and length(@all_providers) > 0}
+                class={["btn btn-outline btn-sm", @testing_all_connections && "loading"]}
+                phx-click="test_all_connections"
+                disabled={@testing_all_connections}
+                title="Test all enabled provider connections"
+              >
+                <.icon :if={!@testing_all_connections} name="hero-signal" class="size-4 mr-2" />
+                {if @testing_all_connections, do: "Testing All...", else: "Test All Connections"}
+              </button>
+              <button
+                :if={@view_mode == :list}
+                class="btn btn-primary btn-sm"
+                phx-click="create_provider"
+              >
+                <.icon name="hero-plus" class="size-4 mr-2" /> New Provider
+              </button>
+              <button
+                :if={@view_mode != :list}
+                class="btn btn-outline btn-sm"
+                phx-click="back_to_list"
+              >
+                <.icon name="hero-arrow-left" class="size-4 mr-2" /> Back to List
+              </button>
+            </div>
+          </:actions>
+        </.header>
+      </div>
+
+      <div class="flex flex-col flex-1 overflow-hidden">
+        <div :if={@view_mode == :list} class="flex-1 overflow-auto">
+          <.providers_list
+            providers={@filtered_providers}
+            search_query={@search_query}
+            type_filter={@type_filter}
+            status_filter={@status_filter}
+            provider_stats={@provider_stats}
+            loading={@loading}
+            deleting={@deleting}
+            testing_connection={@testing_connection}
+            performing_health_check={@performing_health_check}
+          />
+        </div>
+
+        <div :if={@view_mode == :detail && @selected_provider} class="flex-1 overflow-auto">
+          <.provider_detail
+            provider={@selected_provider}
+            connection_test_result={@connection_test_result}
+            testing_connection={@testing_connection}
+            performing_health_check={@performing_health_check}
+          />
+        </div>
+
+        <div
+          :if={@view_mode == :health_metrics && @selected_health_metrics}
+          class="flex-1 overflow-auto"
+        >
+          <.health_metrics_detail
+            metrics={@selected_health_metrics}
+            loading={@health_metrics_loading}
+          />
+        </div>
+
+        <div :if={@view_mode in [:edit, :create] && @selected_provider} class="flex-1 overflow-auto">
+          <.provider_form
+            provider={@selected_provider}
+            mode={@view_mode}
+            available_provider_types={@available_provider_types}
+            available_auth_types={@available_auth_types}
+            saving={@saving}
+            form_errors={@form_errors}
+            validation_errors={@validation_errors}
+          />
+        </div>
+      </div>
+    </AdminLayouts.admin>
+    """
+  end
+
+  # Load providers data using context module with proper filtering
+  defp load_providers_data(socket) do
+    # Set loading state
+    socket = assign(socket, :loading, true)
+
+    filters = build_filters(socket)
+
+    case Providers.list_providers_ui(filters) do
+      {:ok, ui_providers} ->
+        # Load basic statistics
+        stats_result = Providers.get_provider_statistics()
+
+        # Load enhanced analytics
+        analytics_result = Providers.get_dashboard_statistics()
+
+        case {stats_result, analytics_result} do
+          {{:ok, stats}, {:ok, analytics}} ->
+            socket
+            |> assign(:all_providers, ui_providers)
+            |> assign(:filtered_providers, ui_providers)
+            |> assign(:provider_stats, stats)
+            |> assign(:provider_analytics, analytics)
+            |> assign(:loading, false)
+
+          {{:ok, stats}, {:error, _}} ->
+            socket
+            |> assign(:all_providers, ui_providers)
+            |> assign(:filtered_providers, ui_providers)
+            |> assign(:provider_stats, stats)
+            |> assign(:provider_analytics, build_empty_analytics())
+            |> assign(:loading, false)
+
+          {{:error, _}, _} ->
+            socket
+            |> assign(:all_providers, ui_providers)
+            |> assign(:filtered_providers, ui_providers)
+            |> assign(:provider_stats, build_empty_stats())
+            |> assign(:provider_analytics, build_empty_analytics())
+            |> assign(:loading, false)
+        end
+
+      {:error, reason} ->
+        socket
+        |> assign(:all_providers, [])
+        |> assign(:filtered_providers, [])
+        |> assign(:provider_stats, build_empty_stats())
+        |> assign(:provider_analytics, build_empty_analytics())
+        |> assign(:loading, false)
+        |> assign(:last_operation, "load")
+        |> assign(:operation_status, :error)
+        |> put_flash(:error, build_error_message("load providers", reason))
+    end
+  end
+
+  # Load aggregated health metrics
+  defp load_health_metrics(socket) do
+    socket = assign(socket, :health_metrics_loading, true)
+
+    case Providers.get_aggregated_health_metrics() do
+      {:ok, metrics} ->
+        socket
+        |> assign(:aggregated_health_metrics, metrics)
+        |> assign(:health_metrics_loading, false)
+
+      {:error, _reason} ->
+        socket
+        |> assign(:aggregated_health_metrics, build_empty_health_metrics())
+        |> assign(:health_metrics_loading, false)
+    end
+  end
+
+  # Build empty health metrics structure
+  defp build_empty_health_metrics do
+    %{
+      total_providers: 0,
+      enabled_providers: 0,
+      health_distribution: %{
+        online: 0,
+        degraded: 0,
+        offline: 0,
+        unknown: 0
+      },
+      health_percentages: %{
+        online: 0.0,
+        degraded: 0.0,
+        offline: 0.0,
+        unknown: 0.0
+      },
+      average_response_time_ms: nil,
+      system_health_score: 0.0,
+      last_updated: DateTime.utc_now()
+    }
+  end
+
+  # Enhanced filtering with improved search across name, description, and URLs
+  defp filter_providers(socket) do
+    # Since the context module already handles filtering, we just need to reload with new filters
+    load_providers_data(socket)
+  end
+
+  # Build comprehensive filters for the context module
+  defp build_filters(socket) do
+    %{
+      search_query: socket.assigns[:search_query] || "",
+      type_filter: socket.assigns[:type_filter] || "all",
+      status_filter: socket.assigns[:status_filter] || "all",
+      enabled_filter: socket.assigns[:enabled_filter] || "all",
+      group_by_type: socket.assigns[:group_by_type] || false
+    }
+  end
+
+  # Build empty statistics structure
+  defp build_empty_stats do
+    %{
+      total: 0,
+      enabled: 0,
+      disabled: 0,
+      by_type: %{},
+      by_health: %{}
+    }
+  end
+
+  # Build empty analytics structure
+  defp build_empty_analytics do
+    %{
+      basic_stats: build_empty_stats(),
+      usage_analytics: %{
+        total_providers: 0,
+        active_providers: 0,
+        utilization_rate: 0.0,
+        type_distribution: %{},
+        auth_method_usage: %{},
+        health_trends: %{},
+        config_completeness: %{}
+      },
+      cost_analytics: %{
+        total_subscription_cost: 0.0,
+        token_based_count: 0,
+        request_based_count: 0,
+        subscription_count: 0,
+        cost_by_type: %{},
+        avg_token_cost: 0.0,
+        avg_request_cost: 0.0,
+        cost_efficiency: 0.0
+      },
+      performance_metrics: %{
+        avg_response_time: nil,
+        min_response_time: nil,
+        max_response_time: nil,
+        uptime_percentage: 0.0,
+        error_rate: 0.0,
+        performance_by_type: %{},
+        health_distribution: %{},
+        performance_trends: %{}
+      },
+      trends: %{
+        recent_additions: 0,
+        health_changes: %{},
+        recent_updates: 0,
+        growth_metrics: %{},
+        usage_patterns: %{}
+      },
+      last_updated: DateTime.utc_now()
+    }
+  end
+
+  # Validate form parameters without saving (for real-time validation)
+  defp validate_form_params(params) do
+    errors = []
+
+    # Basic validation
+    errors =
+      if is_nil(params["name"]) or String.trim(params["name"]) == "" do
+        ["name: Name is required" | errors]
+      else
+        errors
+      end
+
+    errors =
+      if is_nil(params["type"]) or params["type"] == "" do
+        ["type: Provider type is required" | errors]
+      else
+        errors
+      end
+
+    # Provider type specific validation
+    provider_type = convert_string_to_provider_type(params["type"])
+
+    errors =
+      case validate_provider_type_requirements(params, provider_type) do
+        :ok -> errors
+        {:error, type_errors} -> type_errors ++ errors
+      end
+
+    # URL validation
+    errors =
+      if params["base_url"] && params["base_url"] != "" do
+        case URI.parse(params["base_url"]) do
+          %URI{scheme: scheme} when scheme in ["http", "https"] -> errors
+          _ -> ["base_url: Invalid URL format" | errors]
+        end
+      else
+        errors
+      end
+
+    # Timeout validation
+    errors = validate_timeout_param(params["request_timeout_ms"], "request_timeout_ms", errors)
+
+    errors =
+      validate_timeout_param(params["connection_timeout_ms"], "connection_timeout_ms", errors)
+
+    errors = validate_timeout_param(params["read_timeout_ms"], "read_timeout_ms", errors)
+
+    # Numeric validation
+    errors = validate_numeric_param(params["retries"], "retries", 0, 10, errors)
+
+    errors =
+      validate_numeric_param(params["retry_backoff_ms"], "retry_backoff_ms", 100, 10000, errors)
+
+    errors =
+      validate_numeric_param(params["requests_per_minute"], "requests_per_minute", 1, nil, errors)
+
+    errors =
+      validate_numeric_param(params["requests_per_hour"], "requests_per_hour", 1, nil, errors)
+
+    errors =
+      validate_numeric_param(
+        params["concurrent_connections"],
+        "concurrent_connections",
+        1,
+        nil,
+        errors
+      )
+
+    # JSON validation
+    errors = validate_json_param(params["default_headers"], "default_headers", errors)
+    errors = validate_json_param(params["custom_params"], "custom_params", errors)
+    errors = validate_json_param(params["oauth2_config"], "oauth2_config", errors)
+    errors = validate_json_param(params["custom_auth_headers"], "custom_auth_headers", errors)
+
+    # Cost validation
+    errors =
+      validate_cost_param(params["input_token_cost_per_1k"], "input_token_cost_per_1k", errors)
+
+    errors =
+      validate_cost_param(params["output_token_cost_per_1k"], "output_token_cost_per_1k", errors)
+
+    errors = validate_cost_param(params["request_cost"], "request_cost", errors)
+    errors = validate_cost_param(params["monthly_subscription"], "monthly_subscription", errors)
+
+    if Enum.empty?(errors) do
+      {:ok, params}
+    else
+      {:error, errors}
+    end
+  end
+
+  defp validate_timeout_param(nil, _field, errors), do: errors
+  defp validate_timeout_param("", _field, errors), do: errors
+
+  defp validate_timeout_param(value, field, errors) when is_binary(value) do
+    case Integer.parse(value) do
+      {timeout, ""} when timeout > 0 and timeout <= 300_000 -> errors
+      _ -> ["#{field}: Must be a positive integer between 1 and 300000" | errors]
+    end
+  end
+
+  defp validate_timeout_param(value, field, errors) when is_integer(value) do
+    if value > 0 and value <= 300_000 do
+      errors
+    else
+      ["#{field}: Must be between 1 and 300000" | errors]
+    end
+  end
+
+  defp validate_timeout_param(_, field, errors), do: ["#{field}: Invalid timeout value" | errors]
+
+  defp validate_numeric_param(nil, _field, _min, _max, errors), do: errors
+  defp validate_numeric_param("", _field, _min, _max, errors), do: errors
+
+  defp validate_numeric_param(value, field, min, max, errors) when is_binary(value) do
+    case Integer.parse(value) do
+      {num, ""} -> validate_numeric_range(num, field, min, max, errors)
+      _ -> ["#{field}: Must be a valid number" | errors]
+    end
+  end
+
+  defp validate_numeric_param(value, field, min, max, errors) when is_integer(value) do
+    validate_numeric_range(value, field, min, max, errors)
+  end
+
+  defp validate_numeric_param(_, field, _min, _max, errors),
+    do: ["#{field}: Invalid numeric value" | errors]
+
+  defp validate_numeric_range(num, field, min, max, errors) do
+    cond do
+      min && num < min -> ["#{field}: Must be at least #{min}" | errors]
+      max && num > max -> ["#{field}: Must be at most #{max}" | errors]
+      true -> errors
+    end
+  end
+
+  defp validate_json_param(nil, _field, errors), do: errors
+  defp validate_json_param("", _field, errors), do: errors
+
+  defp validate_json_param(value, field, errors) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, _} -> errors
+      {:error, _} -> ["#{field}: Invalid JSON format" | errors]
+    end
+  end
+
+  defp validate_json_param(_, _field, errors), do: errors
+
+  defp validate_cost_param(nil, _field, errors), do: errors
+  defp validate_cost_param("", _field, errors), do: errors
+
+  defp validate_cost_param(value, field, errors) when is_binary(value) do
+    case Float.parse(value) do
+      {cost, ""} when cost >= 0 -> errors
+      _ -> ["#{field}: Must be a positive number" | errors]
+    end
+  end
+
+  defp validate_cost_param(value, field, errors) when is_number(value) do
+    if value >= 0 do
+      errors
+    else
+      ["#{field}: Must be a positive number" | errors]
+    end
+  end
+
+  defp validate_cost_param(_, field, errors), do: ["#{field}: Invalid cost value" | errors]
+
+  # Build error map from validation error list
+  defp build_error_map(validation_errors) when is_list(validation_errors) do
+    validation_errors
+    |> Enum.reduce(%{}, fn error, acc ->
+      case String.split(error, ":", parts: 2) do
+        [field, message] ->
+          field_atom = String.to_atom(String.trim(field))
+          Map.put(acc, field_atom, String.trim(message))
+
+        [message] ->
+          Map.put(acc, :general, String.trim(message))
+      end
+    end)
+  end
+
+  # Build user-friendly success messages
+  defp build_success_message(action, name \\ nil)
+
+  defp build_success_message("created", name) when is_binary(name) do
+    "Provider '#{name}' has been created successfully! You can now configure and test the connection."
+  end
+
+  defp build_success_message("updated", name) when is_binary(name) do
+    "Provider '#{name}' has been updated successfully! Changes are now active."
+  end
+
+  defp build_success_message("deleted", name) when is_binary(name) do
+    "Provider '#{name}' has been permanently deleted."
+  end
+
+  defp build_success_message("enabled", name) when is_binary(name) do
+    "Provider '#{name}' is now enabled and available for use."
+  end
+
+  defp build_success_message("disabled", name) when is_binary(name) do
+    "Provider '#{name}' has been disabled and is no longer available for use."
+  end
+
+  defp build_success_message(action, _name) do
+    "Operation '#{action}' completed successfully."
+  end
+
+  # Build user-friendly error messages
+  defp build_error_message(operation, reason, name \\ nil)
+
+  defp build_error_message("save", reason, name) when is_binary(name) do
+    "Failed to save provider '#{name}': #{reason}. Please check your input and try again."
+  end
+
+  defp build_error_message("delete", reason, name) when is_binary(name) do
+    "Failed to delete provider '#{name}': #{reason}. The provider may be in use or protected."
+  end
+
+  defp build_error_message("toggle status", reason, name) when is_binary(name) do
+    "Failed to change status of provider '#{name}': #{reason}. Please try again."
+  end
+
+  defp build_error_message("load providers", reason, _name) do
+    "Failed to load providers: #{reason}. Please refresh the page or contact support if the problem persists."
+  end
+
+  defp build_error_message(operation, reason, _name) do
+    "Failed to #{operation}: #{reason}. Please try again or contact support if the problem persists."
+  end
+
+  defp format_test_timestamp(nil), do: "Unknown"
+
+  defp format_test_timestamp(%DateTime{} = dt) do
+    dt
+    |> DateTime.to_string()
+    |> String.replace("T", " ")
+    |> String.replace("Z", " UTC")
+  end
+
+  defp format_test_timestamp(timestamp) when is_binary(timestamp), do: timestamp
+
+  defp test_multiple_providers_async(providers) do
+    # Test providers concurrently with a reasonable timeout
+    tasks =
+      Enum.map(providers, fn provider ->
+        Task.async(fn ->
+          {provider.id, Providers.test_provider_connection(provider.id)}
+        end)
+      end)
+
+    # Wait for all tasks to complete with timeout
+    # 30 second timeout
+    Task.await_many(tasks, 30_000)
+  rescue
+    _ ->
+      # If any task fails, return empty results
+      []
+  end
+
+  defp get_empty_provider do
+    %{
+      id: nil,
+      name: "",
+      enabled: true,
+      type: :cloud,
+      description: "",
+      # Endpoint configuration
+      base_url: "",
+      api_version: "",
+      request_timeout_ms: 30000,
+      connection_timeout_ms: 5000,
+      read_timeout_ms: 30000,
+      retries: 3,
+      retry_backoff_ms: 1000,
+      default_headers: nil,
+      custom_params: nil,
+      # Authentication
+      auth_type: :api_key,
+      api_key: "",
+      oauth2_config: nil,
+      custom_auth_headers: nil,
+      token_refresh_url: "",
+      credentials_encrypted: false,
+      # Rate limiting
+      requests_per_minute: nil,
+      requests_per_hour: nil,
+      concurrent_connections: nil,
+      daily_quota: nil,
+      monthly_quota: nil,
+      burst_limit: nil,
+      # Cost configuration
+      input_token_cost_per_1k: nil,
+      output_token_cost_per_1k: nil,
+      request_cost: nil,
+      monthly_subscription: nil,
+      currency: "USD",
+      billing_model: :token_based,
+      # Health status
+      health_status: :unknown,
+      last_check_at: nil,
+      response_time_ms: nil,
+      error_rate: nil,
+      uptime_percentage: nil,
+      last_error: nil,
+      consecutive_failures: 0,
+      # Metadata
+      tags: [],
+      supported_models: []
+    }
+  end
+
+  # Provider type management and validation helpers
+
+  defp convert_string_to_provider_type(type_string) when is_binary(type_string) do
+    case type_string do
+      "cloud" -> :cloud
+      "local" -> :local
+      "enterprise" -> :enterprise
+      "custom" -> :custom
+      # Default fallback
+      _ -> :cloud
+    end
+  end
+
+  defp convert_string_to_provider_type(type_atom) when is_atom(type_atom), do: type_atom
+
+  defp get_type_specific_fields(provider_type) do
+    case provider_type do
+      :cloud ->
+        %{
+          required_fields: [:base_url, :auth_type],
+          recommended_fields: [:api_version, :rate_limits],
+          hidden_fields: [],
+          default_values: %{
+            request_timeout_ms: 30_000,
+            connection_timeout_ms: 5_000,
+            retries: 3,
+            auth_type: :api_key
+          }
+        }
+
+      :local ->
+        %{
+          required_fields: [:base_url],
+          recommended_fields: [:request_timeout_ms],
+          hidden_fields: [:monthly_subscription, :currency],
+          default_values: %{
+            request_timeout_ms: 10_000,
+            connection_timeout_ms: 2_000,
+            retries: 1,
+            auth_type: :none,
+            billing_model: :request_based
+          }
+        }
+
+      :enterprise ->
+        %{
+          required_fields: [:base_url, :auth_type],
+          recommended_fields: [:oauth2_config, :custom_auth_headers, :rate_limits],
+          hidden_fields: [],
+          default_values: %{
+            request_timeout_ms: 60_000,
+            connection_timeout_ms: 10_000,
+            retries: 5,
+            auth_type: :oauth2,
+            credentials_encrypted: true
+          }
+        }
+
+      :custom ->
+        %{
+          required_fields: [:base_url],
+          recommended_fields: [],
+          hidden_fields: [],
+          default_values: %{
+            request_timeout_ms: 30_000,
+            connection_timeout_ms: 5_000,
+            retries: 3,
+            auth_type: :custom_header
+          }
+        }
+
+      _ ->
+        # Default fallback for unknown types
+        %{
+          required_fields: [:base_url],
+          recommended_fields: [],
+          hidden_fields: [],
+          default_values: %{}
+        }
+    end
+  end
+
+  defp validate_provider_type_requirements(provider_params, provider_type) do
+    type_config = get_type_specific_fields(provider_type)
+    errors = []
+
+    # Check required fields for this provider type
+    errors =
+      Enum.reduce(type_config.required_fields, errors, fn field, acc ->
+        field_value = Map.get(provider_params, to_string(field))
+
+        if is_nil(field_value) or (is_binary(field_value) and String.trim(field_value) == "") do
+          ["#{field}: Required for #{provider_type} providers" | acc]
+        else
+          acc
+        end
+      end)
+
+    # Type-specific validation
+    errors =
+      case provider_type do
+        :cloud ->
+          validate_cloud_provider_requirements(provider_params, errors)
+
+        :local ->
+          validate_local_provider_requirements(provider_params, errors)
+
+        :enterprise ->
+          validate_enterprise_provider_requirements(provider_params, errors)
+
+        :custom ->
+          validate_custom_provider_requirements(provider_params, errors)
+
+        _ ->
+          errors
+      end
+
+    if Enum.empty?(errors) do
+      :ok
+    else
+      {:error, errors}
+    end
+  end
+
+  defp validate_cloud_provider_requirements(provider_params, errors) do
+    # Cloud providers should have authentication configured
+    auth_type = Map.get(provider_params, "auth_type")
+    api_key = Map.get(provider_params, "api_key")
+
+    errors =
+      if auth_type == "api_key" and (is_nil(api_key) or String.trim(api_key) == "") do
+        ["api_key: API key is required for cloud providers with API key authentication" | errors]
+      else
+        errors
+      end
+
+    # Cloud providers should have reasonable rate limits
+    rpm = Map.get(provider_params, "requests_per_minute")
+
+    if rpm && String.to_integer(rpm) > 10_000 do
+      ["requests_per_minute: Rate limit seems too high for cloud provider" | errors]
+    else
+      errors
+    end
+  end
+
+  defp validate_local_provider_requirements(provider_params, errors) do
+    # Local providers should use local URLs
+    base_url = Map.get(provider_params, "base_url")
+
+    errors =
+      if base_url && String.contains?(base_url, ["localhost", "127.0.0.1", "0.0.0.0"]) do
+        errors
+      else
+        if base_url &&
+             !String.starts_with?(base_url, ["http://192.168.", "http://10.", "http://172."]) do
+          [
+            "base_url: Local providers should typically use localhost or private IP addresses"
+            | errors
+          ]
+        else
+          errors
+        end
+      end
+
+    # Local providers shouldn't have subscription costs
+    subscription = Map.get(provider_params, "monthly_subscription")
+
+    if subscription && String.to_float(subscription) > 0 do
+      ["monthly_subscription: Local providers typically don't have subscription costs" | errors]
+    else
+      errors
+    end
+  end
+
+  defp validate_enterprise_provider_requirements(provider_params, errors) do
+    # Enterprise providers should have secure authentication
+    auth_type = Map.get(provider_params, "auth_type")
+
+    errors =
+      if auth_type == "none" do
+        ["auth_type: Enterprise providers should have authentication configured" | errors]
+      else
+        errors
+      end
+
+    # Enterprise providers should have credentials encrypted
+    encrypted = Map.get(provider_params, "credentials_encrypted")
+
+    if encrypted != "true" do
+      ["credentials_encrypted: Enterprise providers should encrypt credentials" | errors]
+    else
+      errors
+    end
+  end
+
+  defp validate_custom_provider_requirements(_provider_params, errors) do
+    # Custom providers have minimal requirements
+    errors
+  end
+
+  defp should_show_field?(field_name, provider_type) do
+    type_config = get_type_specific_fields(provider_type)
+    !Enum.member?(type_config.hidden_fields, field_name)
+  end
+
+  defp is_field_required?(field_name, provider_type) do
+    type_config = get_type_specific_fields(provider_type)
+    Enum.member?(type_config.required_fields, field_name)
+  end
+
+  defp is_field_recommended?(field_name, provider_type) do
+    type_config = get_type_specific_fields(provider_type)
+    Enum.member?(type_config.recommended_fields, field_name)
+  end
+
+  defp get_field_css_classes(field_name, provider_type, base_classes, error_classes \\ nil) do
+    classes = [base_classes]
+
+    classes =
+      if is_field_required?(field_name, provider_type) do
+        ["border-l-4 border-l-primary" | classes]
+      else
+        classes
+      end
+
+    classes =
+      if is_field_recommended?(field_name, provider_type) do
+        ["border-l-2 border-l-secondary" | classes]
+      else
+        classes
+      end
+
+    classes =
+      if error_classes do
+        [error_classes | classes]
+      else
+        classes
+      end
+
+    Enum.join(List.flatten(classes), " ")
+  end
+
+  defp get_base_url_placeholder(provider_type) do
+    case provider_type do
+      :cloud -> "https://api.openai.com/v1"
+      :local -> "http://localhost:1234/v1"
+      :enterprise -> "https://your-org.api.com/v1"
+      :custom -> "https://api.example.com"
+      _ -> "https://api.example.com"
+    end
+  end
+
+  # Enhanced flash message component with better styling, auto-dismiss, and accessibility
+  attr :flash, :map, required: true
+  attr :last_operation, :string, default: nil
+  attr :operation_status, :atom, default: nil
+
+  defp enhanced_flash(assigns) do
+    ~H"""
+    <!-- Success Flash with Auto-dismiss -->
+    <div
+      :if={Phoenix.Flash.get(@flash, :info)}
+      class="alert alert-success shadow-lg mb-4 animate-in slide-in-from-top-2 duration-300"
+      id="success-flash"
+      phx-hook="AutoDismissFlash"
+      data-dismiss-delay="5000"
+      role="alert"
+      aria-live="polite"
+    >
+      <div class="flex items-center gap-3">
+        <.icon name="hero-check-circle" class="size-6 text-success flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <div class="font-medium">Success!</div>
+
+          <div class="text-sm opacity-90 break-words">{Phoenix.Flash.get(@flash, :info)}</div>
+
+          <div :if={@last_operation} class="text-xs opacity-70 mt-1">
+            Operation: {String.capitalize(@last_operation || "unknown")}
+          </div>
+        </div>
+
+        <button
+          class="btn btn-ghost btn-sm hover:bg-success-focus focus:bg-success-focus"
+          onclick="this.parentElement.parentElement.style.display='none'"
+          aria-label="Dismiss success message"
+          title="Dismiss (or wait 5 seconds)"
+        >
+          <.icon name="hero-x-mark" class="size-4" />
+        </button>
+      </div>
+    </div>
+    <!-- Error Flash (no auto-dismiss for errors) -->
+    <div
+      :if={Phoenix.Flash.get(@flash, :error)}
+      class="alert alert-error shadow-lg mb-4 animate-in slide-in-from-top-2 duration-300"
+      id="error-flash"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div class="flex items-center gap-3">
+        <.icon name="hero-exclamation-triangle" class="size-6 text-error flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <div class="font-medium">Error</div>
+
+          <div class="text-sm opacity-90 break-words">{Phoenix.Flash.get(@flash, :error)}</div>
+
+          <div :if={@last_operation} class="text-xs opacity-70 mt-1">
+            Operation: {String.capitalize(@last_operation || "unknown")}
+          </div>
+        </div>
+
+        <button
+          class="btn btn-ghost btn-sm hover:bg-error-focus focus:bg-error-focus"
+          onclick="this.parentElement.parentElement.style.display='none'"
+          aria-label="Dismiss error message"
+          title="Dismiss error message"
+        >
+          <.icon name="hero-x-mark" class="size-4" />
+        </button>
+      </div>
+    </div>
+    <!-- Warning Flash with Auto-dismiss -->
+    <div
+      :if={Phoenix.Flash.get(@flash, :warning)}
+      class="alert alert-warning shadow-lg mb-4 animate-in slide-in-from-top-2 duration-300"
+      id="warning-flash"
+      phx-hook="AutoDismissFlash"
+      data-dismiss-delay="7000"
+      role="alert"
+      aria-live="polite"
+    >
+      <div class="flex items-center gap-3">
+        <.icon name="hero-exclamation-triangle" class="size-6 text-warning flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <div class="font-medium">Warning</div>
+
+          <div class="text-sm opacity-90 break-words">{Phoenix.Flash.get(@flash, :warning)}</div>
+        </div>
+
+        <button
+          class="btn btn-ghost btn-sm hover:bg-warning-focus focus:bg-warning-focus"
+          onclick="this.parentElement.parentElement.style.display='none'"
+          aria-label="Dismiss warning message"
+          title="Dismiss (or wait 7 seconds)"
+        >
+          <.icon name="hero-x-mark" class="size-4" />
+        </button>
+      </div>
+    </div>
+    """
+  end
+
+  # Components
+  attr :providers, :list, required: true
+  attr :search_query, :string, required: true
+  attr :type_filter, :string, required: true
+  attr :status_filter, :string, required: true
+  attr :provider_stats, :map, required: true
+  attr :loading, :boolean, default: false
+  attr :deleting, :boolean, default: false
+  attr :testing_connection, :boolean, default: false
+  attr :performing_health_check, :boolean, default: false
+
+  defp providers_list(assigns) do
+    ~H"""
+    <div class="flex flex-col h-full space-y-4">
+      <!-- Loading Overlay for List -->
+      <div
+        :if={@loading}
+        class="absolute inset-0 bg-base-100/50 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg"
+      >
+        <div class="flex flex-col items-center gap-4">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <p class="text-base-content/70 font-medium">Loading providers...</p>
+        </div>
+      </div>
+      <!-- Provider Statistics -->
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+        <.stat_card title="Total" value={@provider_stats.total} color="primary" />
+        <.stat_card title="Enabled" value={@provider_stats.enabled} color="success" />
+        <.stat_card title="Disabled" value={@provider_stats.disabled} color="warning" />
+        <.stat_card title="Cloud" value={Map.get(@provider_stats.by_type, :cloud, 0)} color="info" />
+        <.stat_card
+          title="Local"
+          value={Map.get(@provider_stats.by_type, :local, 0)}
+          color="secondary"
+        />
+        <.stat_card
+          title="Enterprise"
+          value={Map.get(@provider_stats.by_type, :enterprise, 0)}
+          color="accent"
+        />
+      </div>
+      <!-- Enhanced Filters and Search -->
+      <div class="sticky top-0 z-10 bg-base-100 pt-2 pb-4 space-y-4 border-b">
+        <!-- Primary Search Bar -->
+        <div class="flex flex-wrap gap-3 items-center">
+          <div class="form-control flex-1 min-w-[200px]">
+            <div class="relative">
+              <input
+                type="text"
+                placeholder="Search providers by name, description, or URL..."
+                class="input input-bordered input-sm w-full pl-10"
+                value={@search_query}
+                phx-change="search_providers"
+                phx-value-search={@search_query}
+                phx-debounce="300"
+              />
+              <.icon name="hero-magnifying-glass" class="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-base-content/50" />
+            </div>
+          </div>
+
+          <!-- Clear Filters Button -->
+          <button
+            :if={@search_query != "" or @type_filter != "all" or @status_filter != "all" or @enabled_filter != "all"}
+            class="btn btn-ghost btn-sm"
+            phx-click="clear_filters"
+            title="Clear all filters"
+          >
+            <.icon name="hero-x-mark" class="size-4 mr-1" />
+            Clear
+          </button>
+
+          <!-- Group Toggle -->
+          <button
+            class={["btn btn-sm", if(@group_by_type, do: "btn-primary", else: "btn-outline")]}
+            phx-click="toggle_grouping"
+            title={if @group_by_type, do: "Disable grouping", else: "Group by type"}
+          >
+            <.icon name="hero-squares-2x2" class="size-4 mr-1" />
+            {if @group_by_type, do: "Grouped", else: "Group"}
+          </button>
+        </div>
+
+        <!-- Advanced Filters Row -->
+        <div class="flex flex-wrap gap-3 items-center">
+          <div class="form-control">
+            <label class="label label-text text-xs">Type</label>
+            <select
+              class="select select-bordered select-sm w-40"
+              phx-change="filter_by_type"
+            >
+              <option value="all" selected={@type_filter == "all"}>All Types</option>
+              <option value="cloud" selected={@type_filter == "cloud"}>Cloud</option>
+              <option value="local" selected={@type_filter == "local"}>Local</option>
+              <option value="enterprise" selected={@type_filter == "enterprise"}>Enterprise</option>
+              <option value="custom" selected={@type_filter == "custom"}>Custom</option>
+            </select>
+          </div>
+
+          <div class="form-control">
+            <label class="label label-text text-xs">Health Status</label>
+            <select
+              class="select select-bordered select-sm w-32"
+              phx-change="filter_by_status"
+            >
+              <option value="all" selected={@status_filter == "all"}>All Status</option>
+              <option value="online" selected={@status_filter == "online"}>Online</option>
+              <option value="offline" selected={@status_filter == "offline"}>Offline</option>
+              <option value="degraded" selected={@status_filter == "degraded"}>Degraded</option>
+              <option value="unknown" selected={@status_filter == "unknown"}>Unknown</option>
+            </select>
+          </div>
+
+          <div class="form-control">
+            <label class="label label-text text-xs">Enabled</label>
+            <select
+              class="select select-bordered select-sm w-32"
+              phx-change="filter_by_enabled"
+            >
+              <option value="all" selected={@enabled_filter == "all"}>All</option>
+              <option value="enabled" selected={@enabled_filter == "enabled"}>Enabled</option>
+              <option value="disabled" selected={@enabled_filter == "disabled"}>Disabled</option>
+            </select>
+          </div>
+
+          <!-- Filter Summary -->
+          <div class="flex-1 text-sm text-base-content/70">
+            Showing {length(@providers)} of {@provider_stats.total} providers
+            <%= if @search_query != "" or @type_filter != "all" or @status_filter != "all" or @enabled_filter != "all" do %>
+              (filtered)
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Providers Display -->
+      <div class="flex-1 overflow-hidden min-h-0">
+        <%= if @group_by_type do %>
+          <.grouped_providers_display
+            providers={@providers}
+            loading={@loading}
+            deleting={@deleting}
+            testing_connection={@testing_connection}
+            performing_health_check={@performing_health_check}
+            testing_all_connections={@testing_all_connections}
+            testing_authentication={@testing_authentication}
+          />
+        <% else %>
+          <.flat_providers_display
+            providers={@providers}
+            loading={@loading}
+            deleting={@deleting}
+            testing_connection={@testing_connection}
+            performing_health_check={@performing_health_check}
+            testing_all_connections={@testing_all_connections}
+            testing_authentication={@testing_authentication}
+          />
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  attr :provider, :map, required: true
+  attr :connection_test_result, :map, default: nil
+  attr :testing_connection, :boolean, default: false
+  attr :performing_health_check, :boolean, default: false
+
+  defp provider_detail(assigns) do
+    # Group providers by type
+    grouped_providers = Enum.group_by(assigns.providers, & &1.type)
+    assigns = assign(assigns, :grouped_providers, grouped_providers)
+
+    ~H"""
+    <div class="space-y-6 h-full overflow-auto">
+      <%= for {type, providers} <- @grouped_providers do %>
+        <div class="card bg-base-200 shadow-sm">
+          <div class="card-body p-4">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <.type_badge type={type} />
+                <h3 class="text-lg font-semibold capitalize">{to_string(type)} Providers</h3>
+                <div class="badge badge-neutral">{length(providers)}</div>
+              </div>
+              <div class="text-sm text-base-content/70">
+                {get_type_description(type)}
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th>Status</th>
+                    <th>Health</th>
+                    <th>Authentication</th>
+                    <th>Rate Limits</th>
+                    <th class="w-32">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr :for={provider <- providers} class="hover">
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar placeholder">
+                          <div class="bg-neutral text-neutral-content rounded-full w-8">
+                            <span class="text-xs">{String.first(provider.name)}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="font-medium">{provider.name}</div>
+                          <div class="text-sm text-base-content/70">
+                            {provider.description || "No description"}
+                          </div>
+                          <%= if provider.base_url do %>
+                            <div class="text-xs text-base-content/50 font-mono">
+                              {provider.base_url}
+                            </div>
+                          <% end %>
+                        </div>
+                      </div>
+                    </td>
+                    <td><.status_badge enabled={provider.enabled} /></td>
+                    <td><.health_badge health_status={provider.health_status} /></td>
+                    <td class="text-sm">{format_auth_type(provider.auth_type)}</td>
+                    <td class="text-sm">{provider.rate_limit_summary}</td>
+                    <td>
+                      <.provider_actions
+                        provider={provider}
+                        deleting={@deleting}
+                        testing_connection={@testing_connection}
+                        performing_health_check={@performing_health_check}
+                        testing_all_connections={@testing_all_connections}
+                        testing_authentication={@testing_authentication}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Empty state for grouped view -->
+      <div :if={Enum.empty?(@providers)} class="card bg-base-200 shadow-sm">
+        <div class="card-body text-center py-12">
+          <.icon name="hero-server-stack" class="size-16 text-base-content/30 mb-4 mx-auto" />
+          <h3 class="text-lg font-semibold mb-2">No providers found</h3>
+          <p class="text-base-content/70 mb-4">
+            Try adjusting your search or filters, or create a new provider
+          </p>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Flat providers display component
+  attr :providers, :list, required: true
+  attr :loading, :boolean, default: false
+  attr :deleting, :boolean, default: false
+  attr :testing_connection, :boolean, default: false
+  attr :performing_health_check, :boolean, default: false
+  attr :testing_all_connections, :boolean, default: false
+  attr :testing_authentication, :boolean, default: false
+
+  defp flat_providers_display(assigns) do
+    ~H"""
+    <div class="card bg-base-200 shadow-sm h-full">
+      <div class="card-body p-0 h-full">
+        <div class="overflow-auto h-full">
+          <table class="table table-sm table-pin-rows">
+            <thead>
+              <tr class="sticky top-0 bg-base-200 z-10">
+                <th>Provider</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Health</th>
+                <th>Authentication</th>
+                <th>Rate Limits</th>
+                <th class="w-32">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={provider <- @providers} class="hover">
+                <td>
+                  <div class="flex items-center gap-3">
+                    <div class="avatar placeholder">
+                      <div class="bg-neutral text-neutral-content rounded-full w-8">
+                        <span class="text-xs">{String.first(provider.name)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="font-medium">{provider.name}</div>
+                      <div class="text-sm text-base-content/70">
+                        {provider.description || "No description"}
+                      </div>
+                      <%= if provider.base_url do %>
+                        <div class="text-xs text-base-content/50 font-mono">
+                          {provider.base_url}
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                </td>
+                <td><.type_badge type={provider.type} /></td>
+                <td><.status_badge enabled={provider.enabled} /></td>
+                <td><.health_badge health_status={provider.health_status} /></td>
+                <td class="text-sm">{format_auth_type(provider.auth_type)}</td>
+                <td class="text-sm">{provider.rate_limit_summary}</td>
+                <td>
+                  <.provider_actions
+                    provider={provider}
+                    deleting={@deleting}
+                    testing_connection={@testing_connection}
+                    performing_health_check={@performing_health_check}
+                    testing_all_connections={@testing_all_connections}
+                    testing_authentication={@testing_authentication}
+                  />
+                </td>
+              </tr>
+              <!-- Empty state -->
+              <tr :if={Enum.empty?(@providers)}>
+                <td colspan="7" class="text-center py-8">
+                  <div class="flex flex-col items-center justify-center">
+                    <.icon name="hero-server-stack" class="size-12 text-base-content/30 mb-4" />
+                    <p class="text-base-content/70">No providers found</p>
+                    <p class="text-sm text-base-content/50">
+                      Try adjusting your search or filters, or create a new provider
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Provider actions component (extracted for reuse)
+  attr :provider, :map, required: true
+  attr :deleting, :boolean, default: false
+  attr :testing_connection, :boolean, default: false
+  attr :performing_health_check, :boolean, default: false
+  attr :testing_all_connections, :boolean, default: false
+  attr :testing_authentication, :boolean, default: false
+
+  defp provider_actions(assigns) do
+    ~H"""
+    <div class="flex gap-1">
+      <button
+        class="btn btn-ghost btn-xs"
+        phx-click="view_provider"
+        phx-value-provider_id={@provider.id}
+        title="View Provider"
+      >
+        <.icon name="hero-eye" class="size-3" />
+      </button>
+      <button
+        class="btn btn-ghost btn-xs"
+        phx-click="edit_provider"
+        phx-value-provider_id={@provider.id}
+        title="Edit Provider"
+      >
+        <.icon name="hero-pencil" class="size-3" />
+      </button>
+      <button
+        class={[
+          "btn btn-xs",
+          if(@provider.enabled, do: "btn-warning", else: "btn-success")
+        ]}
+        phx-click="toggle_status"
+        phx-value-provider_id={@provider.id}
+        title={if @provider.enabled, do: "Disable Provider", else: "Enable Provider"}
+      >
+        <.icon
+          name={if @provider.enabled, do: "hero-pause", else: "hero-play"}
+          class="size-3"
+        />
+      </button>
+      <button
+        class={["btn btn-success btn-xs", @performing_health_check && "loading"]}
+        phx-click="perform_health_check"
+        phx-value-provider_id={@provider.id}
+        title="Perform Health Check"
+        disabled={@performing_health_check}
+      >
+        <.icon :if={!@performing_health_check} name="hero-heart" class="size-3" />
+      </button>
+      <button
+        class="btn btn-info btn-xs"
+        phx-click="test_connection"
+        phx-value-provider_id={@provider.id}
+        title="Test Connection"
+        disabled={@testing_connection || @testing_all_connections}
+      >
+        <.icon
+          name={
+            if @testing_connection || @testing_all_connections,
+              do: "hero-arrow-path",
+              else: "hero-signal"
+          }
+          class={[
+            "size-3",
+            (@testing_connection || @testing_all_connections) && "animate-spin"
+          ]}
+        />
+      </button>
+      <button
+        class="btn btn-secondary btn-xs"
+        phx-click="test_authentication"
+        phx-value-provider_id={@provider.id}
+        title="Test Authentication"
+        disabled={@testing_authentication || @provider.auth_type == :none}
+      >
+        <.icon name="hero-shield-check" class="size-3" />
+      </button>
+      <button
+        class="btn btn-ghost btn-xs"
+        phx-click="view_health_metrics"
+        phx-value-provider_id={@provider.id}
+        title="View Health Metrics"
+      >
+        <.icon name="hero-chart-bar" class="size-3" />
+      </button>
+      <button
+        class={["btn btn-error btn-xs", @deleting && "loading"]}
+        phx-click="delete_provider"
+        phx-value-provider_id={@provider.id}
+        onclick={"return confirm('Are you sure you want to delete the provider \"#{@provider.name}\"? This action cannot be undone.')"}
+        title="Delete Provider"
+        disabled={@deleting}
+      >
+        <.icon :if={!@deleting} name="hero-trash" class="size-3" />
+      </button>
+    </div>
+    """
+  end
+
+  # Helper function for type descriptions
+  defp get_type_description(type) do
+    case type do
+      :cloud -> "External cloud-based AI services"
+      :local -> "Self-hosted or local AI services"
+      :enterprise -> "Enterprise-grade AI services"
+      :custom -> "Custom or specialized AI services"
+      _ -> "AI service providers"
+    end
+  end
+
+  # Grouped providers display component
+  attr :providers, :list, required: true
+  attr :loading, :boolean, default: false
+  attr :deleting, :boolean, default: false
+  attr :testing_connection, :boolean, default: false
+  attr :performing_health_check, :boolean, default: false
+  attr :testing_all_connections, :boolean, default: false
+  attr :testing_authentication, :boolean, default: false
+
+  defp grouped_providers_display(assigns) do
+    # Group providers by type
+    grouped_providers = Enum.group_by(assigns.providers, & &1.type)
+    assigns = assign(assigns, :grouped_providers, grouped_providers)
+
+    ~H"""
+    <div class="space-y-6 h-full overflow-auto">
+      <%= for {type, providers} <- @grouped_providers do %>
+        <div class="card bg-base-200 shadow-sm">
+          <div class="card-body p-4">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <.type_badge type={type} />
+                <h3 class="text-lg font-semibold capitalize">{to_string(type)} Providers</h3>
+                <div class="badge badge-neutral">{length(providers)}</div>
+              </div>
+              <div class="text-sm text-base-content/70">
+                {get_type_description(type)}
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th>Status</th>
+                    <th>Health</th>
+                    <th>Authentication</th>
+                    <th>Rate Limits</th>
+                    <th class="w-32">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr :for={provider <- providers} class="hover">
+                    <td>
+                      <div class="flex items-center gap-3">
+                        <div class="avatar placeholder">
+                          <div class="bg-neutral text-neutral-content rounded-full w-8">
+                            <span class="text-xs">{String.first(provider.name)}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="font-medium">{provider.name}</div>
+                          <div class="text-sm text-base-content/70">
+                            {provider.description || "No description"}
+                          </div>
+                          <%= if provider.base_url do %>
+                            <div class="text-xs text-base-content/50 font-mono">
+                              {provider.base_url}
+                            </div>
+                          <% end %>
+                        </div>
+                      </div>
+                    </td>
+                    <td><.status_badge enabled={provider.enabled} /></td>
+                    <td><.health_badge health_status={provider.health_status} /></td>
+                    <td class="text-sm">{format_auth_type(provider.auth_type)}</td>
+                    <td class="text-sm">{provider.rate_limit_summary}</td>
+                    <td>
+                      <.provider_actions
+                        provider={provider}
+                        deleting={@deleting}
+                        testing_connection={@testing_connection}
+                        performing_health_check={@performing_health_check}
+                        testing_all_connections={@testing_all_connections}
+                        testing_authentication={@testing_authentication}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Empty state for grouped view -->
+      <div :if={Enum.empty?(@providers)} class="card bg-base-200 shadow-sm">
+        <div class="card-body text-center py-12">
+          <.icon name="hero-server-stack" class="size-16 text-base-content/30 mb-4 mx-auto" />
+          <h3 class="text-lg font-semibold mb-2">No providers found</h3>
+          <p class="text-base-content/70 mb-4">
+            Try adjusting your search or filters, or create a new provider
+          </p>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Flat providers display component
+  attr :providers, :list, required: true
+  attr :loading, :boolean, default: false
+  attr :deleting, :boolean, default: false
+  attr :testing_connection, :boolean, default: false
+  attr :performing_health_check, :boolean, default: false
+  attr :testing_all_connections, :boolean, default: false
+  attr :testing_authentication, :boolean, default: false
+
+  defp flat_providers_display(assigns) do
+    ~H"""
+    <div class="card bg-base-200 shadow-sm h-full">
+      <div class="card-body p-0 h-full">
+        <div class="overflow-auto h-full">
+          <table class="table table-sm table-pin-rows">
+            <thead>
+              <tr class="sticky top-0 bg-base-200 z-10">
+                <th>Provider</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Health</th>
+                <th>Authentication</th>
+                <th>Rate Limits</th>
+                <th class="w-32">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={provider <- @providers} class="hover">
+                <td>
+                  <div class="flex items-center gap-3">
+                    <div class="avatar placeholder">
+                      <div class="bg-neutral text-neutral-content rounded-full w-8">
+                        <span class="text-xs">{String.first(provider.name)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="font-medium">{provider.name}</div>
+                      <div class="text-sm text-base-content/70">
+                        {provider.description || "No description"}
+                      </div>
+                      <%= if provider.base_url do %>
+                        <div class="text-xs text-base-content/50 font-mono">
+                          {provider.base_url}
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                </td>
+                <td><.type_badge type={provider.type} /></td>
+                <td><.status_badge enabled={provider.enabled} /></td>
+                <td><.health_badge health_status={provider.health_status} /></td>
+                <td class="text-sm">{format_auth_type(provider.auth_type)}</td>
+                <td class="text-sm">{provider.rate_limit_summary}</td>
+                <td>
+                  <.provider_actions
+                    provider={provider}
+                    deleting={@deleting}
+                    testing_connection={@testing_connection}
+                    performing_health_check={@performing_health_check}
+                    testing_all_connections={@testing_all_connections}
+                    testing_authentication={@testing_authentication}
+                  />
+                </td>
+              </tr>
+              <!-- Empty state -->
+              <tr :if={Enum.empty?(@providers)}>
+                <td colspan="7" class="text-center py-8">
+                  <div class="flex flex-col items-center justify-center">
+                    <.icon name="hero-server-stack" class="size-12 text-base-content/30 mb-4" />
+                    <p class="text-base-content/70">No providers found</p>
+                    <p class="text-sm text-base-content/50">
+                      Try adjusting your search or filters, or create a new provider
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Provider actions component (extracted for reuse)
+  attr :provider, :map, required: true
+  attr :deleting, :boolean, default: false
+  attr :testing_connection, :boolean, default: false
+  attr :performing_health_check, :boolean, default: false
+  attr :testing_all_connections, :boolean, default: false
+  attr :testing_authentication, :boolean, default: false
+
+  defp provider_actions(assigns) do
+    ~H"""
+    <div class="flex gap-1">
+      <button
+        class="btn btn-ghost btn-xs"
+        phx-click="view_provider"
+        phx-value-provider_id={@provider.id}
+        title="View Provider"
+      >
+        <.icon name="hero-eye" class="size-3" />
+      </button>
+      <button
+        class="btn btn-ghost btn-xs"
+        phx-click="edit_provider"
+        phx-value-provider_id={@provider.id}
+        title="Edit Provider"
+      >
+        <.icon name="hero-pencil" class="size-3" />
+      </button>
+      <button
+        class={[
+          "btn btn-xs",
+          if(@provider.enabled, do: "btn-warning", else: "btn-success")
+        ]}
+        phx-click="toggle_status"
+        phx-value-provider_id={@provider.id}
+        title={if @provider.enabled, do: "Disable Provider", else: "Enable Provider"}
+      >
+        <.icon
+          name={if @provider.enabled, do: "hero-pause", else: "hero-play"}
+          class="size-3"
+        />
+      </button>
+      <button
+        class={["btn btn-success btn-xs", @performing_health_check && "loading"]}
+        phx-click="perform_health_check"
+        phx-value-provider_id={@provider.id}
+        title="Perform Health Check"
+        disabled={@performing_health_check}
+      >
+        <.icon :if={!@performing_health_check} name="hero-heart" class="size-3" />
+      </button>
+      <button
+        class="btn btn-info btn-xs"
+        phx-click="test_connection"
+        phx-value-provider_id={@provider.id}
+        title="Test Connection"
+        disabled={@testing_connection || @testing_all_connections}
+      >
+        <.icon
+          name={
+            if @testing_connection || @testing_all_connections,
+              do: "hero-arrow-path",
+              else: "hero-signal"
+          }
+          class={[
+            "size-3",
+            (@testing_connection || @testing_all_connections) && "animate-spin"
+          ]}
+        />
+      </button>
+      <button
+        class="btn btn-secondary btn-xs"
+        phx-click="test_authentication"
+        phx-value-provider_id={@provider.id}
+        title="Test Authentication"
+        disabled={@testing_authentication || @provider.auth_type == :none}
+      >
+        <.icon name="hero-shield-check" class="size-3" />
+      </button>
+      <button
+        class="btn btn-ghost btn-xs"
+        phx-click="view_health_metrics"
+        phx-value-provider_id={@provider.id}
+        title="View Health Metrics"
+      >
+        <.icon name="hero-chart-bar" class="size-3" />
+      </button>
+      <button
+        class={["btn btn-error btn-xs", @deleting && "loading"]}
+        phx-click="delete_provider"
+        phx-value-provider_id={@provider.id}
+        onclick={"return confirm('Are you sure you want to delete the provider \"#{@provider.name}\"? This action cannot be undone.')"}
+        title="Delete Provider"
+        disabled={@deleting}
+      >
+        <.icon :if={!@deleting} name="hero-trash" class="size-3" />
+      </button>
+    </div>
+    """
+  end
+
+  # Helper function for type descriptions
+  defp get_type_description(type) do
+    case type do
+      :cloud -> "External cloud-based AI services"
+      :local -> "Self-hosted or local AI services"
+      :enterprise -> "Enterprise-grade AI services"
+      :custom -> "Custom or specialized AI services"
+      _ -> "AI service providers"
+    end
+  end
+
+  attr :provider, :map, required: true
+  attr :mode, :atom, required: true
+  attr :available_provider_types, :list, required: true
+  attr :available_auth_types, :list, required: true
+  attr :saving, :boolean, default: false
+  attr :form_errors, :map, default: %{}
+  attr :validation_errors, :map, default: %{}
+
+  defp provider_form(assigns) do
+    ~H"""
+    <div class="card bg-base-200 shadow-sm max-w-6xl mx-auto">
+      <div class="card-body">
+        <h3 class="card-title text-lg">
+          {if @mode == :create, do: "Create New Provider", else: "Edit Provider"}
+        </h3>
+        <!-- Loading Overlay -->
+        <div
+          :if={@saving}
+          class="absolute inset-0 bg-base-100/50 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg"
+        >
+          <div class="flex flex-col items-center gap-4">
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+            <p class="text-base-content/70 font-medium">
+              {if @mode == :create, do: "Creating provider...", else: "Saving changes..."}
+            </p>
+          </div>
+        </div>
+        <!-- General Error Alert -->
+        <div :if={Map.has_key?(@form_errors, :general)} class="alert alert-error mb-4">
+          <.icon name="hero-exclamation-triangle" class="size-5" />
+          <span>{@form_errors.general}</span>
+        </div>
+
+        <form
+          phx-submit="save_provider"
+          phx-change="validate_provider"
+          class="space-y-6"
+          id="provider-form"
+        >
+          <!-- Basic Information Section -->
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+              <h4 class="card-title text-base mb-4 flex items-center gap-2">
+                <.icon name="hero-identification" class="size-5" /> Basic Information
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text">Name <span class="text-error">*</span></span>
+                  </label>
+                  <input
+                    type="text"
+                    name="provider[name]"
+                    value={@provider.name}
+                    class={[
+                      "input input-bordered w-full",
+                      Map.has_key?(@form_errors, :name) && "input-error"
+                    ]}
+                    placeholder="e.g., OpenAI GPT-4"
+                    required
+                    disabled={@saving}
+                  />
+                  <label :if={Map.has_key?(@form_errors, :name)} class="label">
+                    <span class="label-text-alt text-error">{@form_errors.name}</span>
+                  </label>
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text">Provider Type <span class="text-error">*</span></span>
+                  </label>
+                  <select
+                    name="provider[type]"
+                    class={[
+                      "select select-bordered w-full",
+                      Map.has_key?(@form_errors, :type) && "select-error"
+                    ]}
+                    required
+                    disabled={@saving}
+                    phx-change="provider_type_changed"
+                  >
+                    <option value="">Select provider type...</option>
+
+                    <option
+                      :for={type <- @available_provider_types}
+                      value={type.value}
+                      selected={to_string(@provider.type) == type.value}
+                    >
+                      {type.label} - {type.description}
+                    </option>
+                  </select>
+                  <label :if={Map.has_key?(@form_errors, :type)} class="label">
+                    <span class="label-text-alt text-error">{@form_errors.type}</span>
+                  </label>
+                  <label class="label">
+                    <span class="label-text-alt">
+                      <span :if={@provider.type == :cloud} class="text-info">
+                        ℹ️ Cloud providers require authentication and have rate limits
+                      </span>
+                      <span :if={@provider.type == :local} class="text-secondary">
+                        🏠 Local providers typically use localhost URLs and no authentication
+                      </span>
+                      <span :if={@provider.type == :enterprise} class="text-accent">
+                        🏢 Enterprise providers require secure authentication and encryption
+                      </span>
+                      <span :if={@provider.type == :custom} class="text-warning">
+                        ⚙️ Custom providers have flexible configuration options
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                <div class="form-control md:col-span-2">
+                  <label class="label"><span class="label-text">Description</span></label> <textarea
+                    name="provider[description]"
+                    class="textarea textarea-bordered w-full"
+                    placeholder="Brief description of this provider..."
+                    disabled={@saving}
+                    rows="3"
+                  >{@provider.description}</textarea>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Enabled</span></label>
+                  <input
+                    type="checkbox"
+                    name="provider[enabled]"
+                    class="toggle toggle-primary"
+                    checked={@provider.enabled}
+                    disabled={@saving}
+                  />
+                  <label class="label">
+                    <span class="label-text-alt">Enable this provider for use</span>
+                  </label>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Tags</span></label>
+                  <input
+                    type="text"
+                    name="provider[tags]"
+                    value={format_tags(@provider.tags)}
+                    class="input input-bordered w-full"
+                    placeholder="tag1, tag2, tag3"
+                    disabled={@saving}
+                  />
+                  <label class="label">
+                    <span class="label-text-alt">Comma-separated tags for organization</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Endpoint Configuration Section -->
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+              <h4 class="card-title text-base mb-4 flex items-center gap-2">
+                <.icon name="hero-globe-alt" class="size-5" /> Endpoint Configuration
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="form-control md:col-span-2">
+                  <label class="label">
+                    <span class="label-text">
+                      Base URL
+                      <span :if={is_field_required?(:base_url, @provider.type)} class="text-error">
+                        *
+                      </span>
+                      <span
+                        :if={is_field_recommended?(:base_url, @provider.type)}
+                        class="text-secondary"
+                      >
+                        †
+                      </span>
+                    </span>
+                  </label>
+                  <input
+                    type="url"
+                    name="provider[base_url]"
+                    value={@provider.base_url}
+                    class={
+                      get_field_css_classes(
+                        :base_url,
+                        @provider.type,
+                        "input input-bordered w-full",
+                        Map.has_key?(@form_errors, :base_url) && "input-error"
+                      )
+                    }
+                    placeholder={get_base_url_placeholder(@provider.type)}
+                    disabled={@saving}
+                  />
+                  <label :if={Map.has_key?(@form_errors, :base_url)} class="label">
+                    <span class="label-text-alt text-error">{@form_errors.base_url}</span>
+                  </label>
+                  <label class="label">
+                    <span class="label-text-alt">
+                      <span :if={@provider.type == :local} class="text-secondary">
+                        💡 Use localhost or private IP addresses for local providers
+                      </span>
+                      <span :if={@provider.type == :cloud} class="text-info">
+                        🌐 Use the official API endpoint for cloud providers
+                      </span>
+                      <span :if={@provider.type == :enterprise} class="text-accent">
+                        🏢 Use your organization's API gateway or endpoint
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">API Version</span></label>
+                  <input
+                    type="text"
+                    name="provider[api_version]"
+                    value={@provider.api_version}
+                    class="input input-bordered w-full"
+                    placeholder="v1"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Request Timeout (ms)</span></label>
+                  <input
+                    type="number"
+                    name="provider[request_timeout_ms]"
+                    value={@provider.request_timeout_ms}
+                    class="input input-bordered w-full"
+                    placeholder="30000"
+                    min="1000"
+                    max="300000"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Connection Timeout (ms)</span></label>
+                  <input
+                    type="number"
+                    name="provider[connection_timeout_ms]"
+                    value={@provider.connection_timeout_ms}
+                    class="input input-bordered w-full"
+                    placeholder="5000"
+                    min="1000"
+                    max="60000"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Read Timeout (ms)</span></label>
+                  <input
+                    type="number"
+                    name="provider[read_timeout_ms]"
+                    value={@provider.read_timeout_ms}
+                    class="input input-bordered w-full"
+                    placeholder="30000"
+                    min="1000"
+                    max="300000"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Max Retries</span></label>
+                  <input
+                    type="number"
+                    name="provider[retries]"
+                    value={@provider.retries}
+                    class="input input-bordered w-full"
+                    placeholder="3"
+                    min="0"
+                    max="10"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Retry Backoff (ms)</span></label>
+                  <input
+                    type="number"
+                    name="provider[retry_backoff_ms]"
+                    value={@provider.retry_backoff_ms}
+                    class="input input-bordered w-full"
+                    placeholder="1000"
+                    min="100"
+                    max="10000"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Default Headers (JSON)</span></label> <textarea
+                    name="provider[default_headers]"
+                    class="textarea textarea-bordered w-full"
+                    placeholder='{"Content-Type": "application/json"}'
+                    disabled={@saving}
+                    rows="3"
+                  >{format_json_field(@provider.default_headers)}</textarea>
+                </div>
+
+                <div class="form-control md:col-span-2">
+                  <label class="label">
+                    <span class="label-text">Custom Parameters (JSON)</span>
+                  </label>
+                  <textarea
+                    name="provider[custom_params]"
+                    class="textarea textarea-bordered w-full"
+                    placeholder='{"param1": "value1", "param2": "value2"}'
+                    disabled={@saving}
+                    rows="3"
+                  >{format_json_field(@provider.custom_params)}</textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Authentication Section -->
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="card-title text-base flex items-center gap-2">
+                  <.icon name="hero-key" class="size-5" /> Authentication
+                </h4>
+                <!-- Authentication Test Button -->
+                <button
+                  :if={@mode == :edit && @provider.id}
+                  type="button"
+                  class={[
+                    "btn btn-sm btn-outline",
+                    @testing_authentication && "loading"
+                  ]}
+                  phx-click="test_authentication"
+                  phx-value-provider_id={@provider.id}
+                  disabled={@testing_authentication || @saving}
+                >
+                  <.icon :if={!@testing_authentication} name="hero-shield-check" class="size-4 mr-1" />
+                  Test Auth
+                </button>
+              </div>
+
+    <!-- Authentication Test Result -->
+              <div
+                :if={@auth_test_result}
+                class={[
+                  "alert mb-4",
+                  case @auth_test_result.status do
+                    :success -> "alert-success"
+                    :error -> "alert-error"
+                    :info -> "alert-info"
+                    _ -> "alert-info"
+                  end
+                ]}
+              >
+                <.icon
+                  name={
+                    case @auth_test_result.status do
+                      :success -> "hero-check-circle"
+                      :error -> "hero-exclamation-triangle"
+                      _ -> "hero-information-circle"
+                    end
+                  }
+                  class="size-5"
+                />
+                <span>{@auth_test_result.message}</span>
+              </div>
+
+    <!-- Authentication Validation Errors -->
+              <div
+                :if={@auth_validation_errors && map_size(@auth_validation_errors) > 0}
+                class="alert alert-error mb-4"
+              >
+                <.icon name="hero-exclamation-triangle" class="size-5" />
+                <div>
+                  <div class="font-medium">Authentication Configuration Error</div>
+                  <div :for={{field, error} <- @auth_validation_errors} class="text-sm">
+                    {if field == :general, do: error, else: "#{field}: #{error}"}
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text">
+                      Authentication Type
+                      <span :if={is_field_required?(:auth_type, @provider.type)} class="text-error">
+                        *
+                      </span>
+                      <span
+                        :if={is_field_recommended?(:auth_type, @provider.type)}
+                        class="text-secondary"
+                      >
+                        †
+                      </span>
+                    </span>
+                  </label>
+                  <select
+                    name="provider[auth_type]"
+                    class={
+                      get_field_css_classes(
+                        :auth_type,
+                        @provider.type,
+                        "select select-bordered w-full"
+                      )
+                    }
+                    disabled={@saving}
+                    phx-change="validate_authentication"
+                  >
+                    <option
+                      :for={auth_type <- @available_auth_types}
+                      value={auth_type.value}
+                      selected={to_string(@provider.auth_type) == auth_type.value}
+                    >
+                      {auth_type.label} - {auth_type.description}
+                    </option>
+                  </select>
+                  <label class="label">
+                    <span class="label-text-alt">
+                      <span :if={@provider.type == :cloud} class="text-info">
+                        🔑 Cloud providers typically require API key authentication
+                      </span>
+                      <span :if={@provider.type == :local} class="text-secondary">
+                        🏠 Local providers often don't require authentication
+                      </span>
+                      <span :if={@provider.type == :enterprise} class="text-accent">
+                        🏢 Enterprise providers should use OAuth2 or custom headers
+                      </span>
+                      <span :if={@provider.type == :custom} class="text-warning">
+                        ⚙️ Custom providers support flexible authentication methods
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+    <!-- API Key Field (shown when auth_type is api_key) -->
+                <div
+                  :if={to_string(@provider.auth_type) == "api_key"}
+                  class="form-control"
+                >
+                  <label class="label">
+                    <span class="label-text">
+                      API Key
+                      <span :if={@provider.type in [:cloud, :enterprise]} class="text-error">*</span>
+                    </span>
+                  </label>
+                  <div class="relative">
+                    <input
+                      type="password"
+                      name="provider[api_key]"
+                      value={if @mode == :create, do: "", else: ""}
+                      class={[
+                        "input input-bordered w-full pr-10",
+                        Map.has_key?(@auth_validation_errors, :api_key) && "input-error"
+                      ]}
+                      placeholder={
+                        if @mode == :create,
+                          do: "Enter API key...",
+                          else: "Enter new API key (leave empty to keep existing)"
+                      }
+                      disabled={@saving}
+                      phx-change="validate_authentication"
+                    />
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                      <.icon name="hero-eye-slash" class="size-4 text-base-content/50" />
+                    </div>
+                  </div>
+                  <label :if={Map.has_key?(@auth_validation_errors, :api_key)} class="label">
+                    <span class="label-text-alt text-error">{@auth_validation_errors.api_key}</span>
+                  </label>
+                  <label :if={@mode == :edit} class="label">
+                    <span class="label-text-alt">
+                      Current: {if @provider.api_key, do: "••••••••••••••••", else: "Not set"}
+                    </span>
+                  </label>
+                </div>
+
+    <!-- Token Refresh URL (shown for OAuth2) -->
+                <div
+                  :if={to_string(@provider.auth_type) == "oauth2"}
+                  class="form-control"
+                >
+                  <label class="label"><span class="label-text">Token Refresh URL</span></label>
+                  <input
+                    type="url"
+                    name="provider[token_refresh_url]"
+                    value={@provider.token_refresh_url}
+                    class="input input-bordered w-full"
+                    placeholder="https://api.example.com/oauth/token"
+                    disabled={@saving}
+                  />
+                </div>
+
+    <!-- Credentials Encryption Toggle -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text">
+                      Encrypt Credentials
+                      <span :if={@provider.type == :enterprise} class="text-error">*</span>
+                    </span>
+                  </label>
+                  <div class="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      name="provider[credentials_encrypted]"
+                      class="toggle toggle-primary"
+                      checked={@provider.credentials_encrypted || @provider.type == :enterprise}
+                      disabled={@saving || @provider.type == :enterprise}
+                    />
+                    <span class="text-sm text-base-content/70">
+                      {if @provider.type == :enterprise,
+                        do: "Required for enterprise providers",
+                        else: "Recommended for production use"}
+                    </span>
+                  </div>
+                  <label class="label">
+                    <span class="label-text-alt">
+                      <span :if={@provider.credentials_encrypted} class="text-success">
+                        🔒 Credentials will be encrypted before storage
+                      </span>
+                      <span
+                        :if={!@provider.credentials_encrypted && @provider.type != :enterprise}
+                        class="text-warning"
+                      >
+                        ⚠️ Credentials will be stored in plain text
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+    <!-- OAuth2 Configuration (shown when auth_type is oauth2) -->
+                <div
+                  :if={to_string(@provider.auth_type) == "oauth2"}
+                  class="form-control md:col-span-2"
+                >
+                  <label class="label">
+                    <span class="label-text">
+                      OAuth2 Configuration (JSON) <span class="text-error">*</span>
+                    </span>
+                  </label>
+                  <textarea
+                    name="provider[oauth2_config]"
+                    class={[
+                      "textarea textarea-bordered w-full",
+                      Map.has_key?(@auth_validation_errors, :oauth2_config) && "textarea-error"
+                    ]}
+                    placeholder='{"client_id": "your_client_id", "client_secret": "your_client_secret", "scope": "read write", "redirect_uri": "https://your-app.com/callback"}'
+                    disabled={@saving}
+                    rows="4"
+                    phx-change="validate_authentication"
+                  >{format_json_field(@provider.oauth2_config)}</textarea>
+                  <label :if={Map.has_key?(@auth_validation_errors, :oauth2_config)} class="label">
+                    <span class="label-text-alt text-error">
+                      {@auth_validation_errors.oauth2_config}
+                    </span>
+                  </label>
+                  <label class="label">
+                    <span class="label-text-alt">
+                      Required fields: client_id, client_secret. Optional: scope, redirect_uri, token_url
+                    </span>
+                  </label>
+                </div>
+
+    <!-- Custom Auth Headers (shown when auth_type is custom_header) -->
+                <div
+                  :if={to_string(@provider.auth_type) == "custom_header"}
+                  class="form-control md:col-span-2"
+                >
+                  <label class="label">
+                    <span class="label-text">
+                      Custom Auth Headers (JSON) <span class="text-error">*</span>
+                    </span>
+                  </label>
+                  <textarea
+                    name="provider[custom_auth_headers]"
+                    class={[
+                      "textarea textarea-bordered w-full",
+                      Map.has_key?(@auth_validation_errors, :custom_auth_headers) && "textarea-error"
+                    ]}
+                    placeholder='{"X-API-Key": "your_api_key", "Authorization": "Bearer your_token", "X-Auth-Token": "your_auth_token"}'
+                    disabled={@saving}
+                    rows="3"
+                    phx-change="validate_authentication"
+                  >{format_json_field(@provider.custom_auth_headers)}</textarea>
+                  <label
+                    :if={Map.has_key?(@auth_validation_errors, :custom_auth_headers)}
+                    class="label"
+                  >
+                    <span class="label-text-alt text-error">
+                      {@auth_validation_errors.custom_auth_headers}
+                    </span>
+                  </label>
+                  <label class="label">
+                    <span class="label-text-alt">
+                      Common headers: Authorization, X-API-Key, X-Auth-Token, Bearer
+                    </span>
+                  </label>
+                </div>
+
+    <!-- Security Notice -->
+                <div class="md:col-span-2">
+                  <div class="alert alert-info">
+                    <.icon name="hero-shield-check" class="size-5" />
+                    <div>
+                      <div class="font-medium">Security Notice</div>
+                      <div class="text-sm">
+                        • Credentials are masked in the UI for security
+                        • {if @provider.credentials_encrypted,
+                          do: "Encryption is enabled",
+                          else: "Consider enabling encryption for production"} • Test authentication before saving to verify configuration
+                        • Existing credentials are preserved when fields are left empty
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Rate Limits Section -->
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+              <h4 class="card-title text-base mb-4 flex items-center gap-2">
+                <.icon name="hero-clock" class="size-5" /> Rate Limits & Quotas
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Requests per Minute</span></label>
+                  <input
+                    type="number"
+                    name="provider[requests_per_minute]"
+                    value={@provider.requests_per_minute}
+                    class="input input-bordered w-full"
+                    placeholder="60"
+                    min="1"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Requests per Hour</span></label>
+                  <input
+                    type="number"
+                    name="provider[requests_per_hour]"
+                    value={@provider.requests_per_hour}
+                    class="input input-bordered w-full"
+                    placeholder="3600"
+                    min="1"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Concurrent Connections</span></label>
+                  <input
+                    type="number"
+                    name="provider[concurrent_connections]"
+                    value={@provider.concurrent_connections}
+                    class="input input-bordered w-full"
+                    placeholder="10"
+                    min="1"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Daily Quota</span></label>
+                  <input
+                    type="number"
+                    name="provider[daily_quota]"
+                    value={@provider.daily_quota}
+                    class="input input-bordered w-full"
+                    placeholder="10000"
+                    min="1"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Monthly Quota</span></label>
+                  <input
+                    type="number"
+                    name="provider[monthly_quota]"
+                    value={@provider.monthly_quota}
+                    class="input input-bordered w-full"
+                    placeholder="300000"
+                    min="1"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Burst Limit</span></label>
+                  <input
+                    type="number"
+                    name="provider[burst_limit]"
+                    value={@provider.burst_limit}
+                    class="input input-bordered w-full"
+                    placeholder="100"
+                    min="1"
+                    disabled={@saving}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Cost Configuration Section -->
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+              <h4 class="card-title text-base mb-4 flex items-center gap-2">
+                <.icon name="hero-currency-dollar" class="size-5" /> Cost Configuration
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text">Input Token Cost (per 1K)</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="provider[input_token_cost_per_1k]"
+                    value={@provider.input_token_cost_per_1k}
+                    class="input input-bordered w-full"
+                    placeholder="0.001"
+                    step="0.0001"
+                    min="0"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text">Output Token Cost (per 1K)</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="provider[output_token_cost_per_1k]"
+                    value={@provider.output_token_cost_per_1k}
+                    class="input input-bordered w-full"
+                    placeholder="0.002"
+                    step="0.0001"
+                    min="0"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Request Cost</span></label>
+                  <input
+                    type="number"
+                    name="provider[request_cost]"
+                    value={@provider.request_cost}
+                    class="input input-bordered w-full"
+                    placeholder="0.01"
+                    step="0.001"
+                    min="0"
+                    disabled={@saving}
+                  />
+                </div>
+
+                <div
+                  :if={should_show_field?(:monthly_subscription, @provider.type)}
+                  class="form-control"
+                >
+                  <label class="label"><span class="label-text">Monthly Subscription</span></label>
+                  <input
+                    type="number"
+                    name="provider[monthly_subscription]"
+                    value={@provider.monthly_subscription}
+                    class="input input-bordered w-full"
+                    placeholder="20.00"
+                    step="0.01"
+                    min="0"
+                    disabled={@saving}
+                  />
+                  <label class="label">
+                    <span class="label-text-alt">Fixed monthly cost for this provider</span>
+                  </label>
+                </div>
+
+                <div :if={should_show_field?(:currency, @provider.type)} class="form-control">
+                  <label class="label"><span class="label-text">Currency</span></label>
+                  <select
+                    name="provider[currency]"
+                    class="select select-bordered w-full"
+                    disabled={@saving}
+                  >
+                    <option value="USD" selected={@provider.currency == "USD"}>USD</option>
+
+                    <option value="EUR" selected={@provider.currency == "EUR"}>EUR</option>
+
+                    <option value="GBP" selected={@provider.currency == "GBP"}>GBP</option>
+
+                    <option value="JPY" selected={@provider.currency == "JPY"}>JPY</option>
+                  </select>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Billing Model</span></label>
+                  <select
+                    name="provider[billing_model]"
+                    class="select select-bordered w-full"
+                    disabled={@saving}
+                  >
+                    <option value="token_based" selected={@provider.billing_model == :token_based}>
+                      Token Based
+                    </option>
+
+                    <option value="request_based" selected={@provider.billing_model == :request_based}>
+                      Request Based
+                    </option>
+
+                    <option value="subscription" selected={@provider.billing_model == :subscription}>
+                      Subscription
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Health Status Display Section -->
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+              <h4 class="card-title text-base mb-4 flex items-center gap-2">
+                <.icon name="hero-heart" class="size-5" /> Health Status & Monitoring
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Health Status</span></label>
+                  <select
+                    name="provider[health_status]"
+                    class="select select-bordered w-full"
+                    disabled={@saving}
+                  >
+                    <option value="unknown" selected={@provider.health_status == :unknown}>
+                      Unknown
+                    </option>
+
+                    <option value="online" selected={@provider.health_status == :online}>
+                      Online
+                    </option>
+
+                    <option value="offline" selected={@provider.health_status == :offline}>
+                      Offline
+                    </option>
+
+                    <option value="degraded" selected={@provider.health_status == :degraded}>
+                      Degraded
+                    </option>
+                  </select>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Response Time (ms)</span></label>
+                  <input
+                    type="number"
+                    name="provider[response_time_ms]"
+                    value={@provider.response_time_ms}
+                    class="input input-bordered w-full"
+                    placeholder="150"
+                    min="0"
+                    disabled={@saving}
+                    readonly
+                  />
+                  <label class="label">
+                    <span class="label-text-alt">Automatically updated by health checks</span>
+                  </label>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Error Rate (%)</span></label>
+                  <input
+                    type="number"
+                    name="provider[error_rate]"
+                    value={@provider.error_rate}
+                    class="input input-bordered w-full"
+                    placeholder="0.5"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    disabled={@saving}
+                    readonly
+                  />
+                  <label class="label">
+                    <span class="label-text-alt">Automatically calculated</span>
+                  </label>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Uptime Percentage</span></label>
+                  <input
+                    type="number"
+                    name="provider[uptime_percentage]"
+                    value={@provider.uptime_percentage}
+                    class="input input-bordered w-full"
+                    placeholder="99.9"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    disabled={@saving}
+                    readonly
+                  />
+                  <label class="label">
+                    <span class="label-text-alt">Automatically calculated</span>
+                  </label>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Consecutive Failures</span></label>
+                  <input
+                    type="number"
+                    name="provider[consecutive_failures]"
+                    value={@provider.consecutive_failures}
+                    class="input input-bordered w-full"
+                    placeholder="0"
+                    min="0"
+                    disabled={@saving}
+                    readonly
+                  />
+                  <label class="label">
+                    <span class="label-text-alt">Reset when connection succeeds</span>
+                  </label>
+                </div>
+
+                <div class="form-control">
+                  <label class="label"><span class="label-text">Last Error</span></label> <textarea
+                    name="provider[last_error]"
+                    class="textarea textarea-bordered w-full"
+                    placeholder="No errors recorded"
+                    disabled={@saving}
+                    readonly
+                    rows="2"
+                  >{@provider.last_error}</textarea>
+                </div>
+
+                <div class="form-control md:col-span-3">
+                  <label class="label"><span class="label-text">Supported Models</span></label> <textarea
+                    name="provider[supported_models]"
+                    class="textarea textarea-bordered w-full"
+                    placeholder="gpt-4, gpt-3.5-turbo, claude-3"
+                    disabled={@saving}
+                    rows="3"
+                  >{format_models(@provider.supported_models)}</textarea>
+                  <label class="label">
+                    <span class="label-text-alt">Comma-separated list of supported model names</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Form Actions -->
+          <div class="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              class="btn btn-outline"
+              phx-click="back_to_list"
+              disabled={@saving}
+            >
+              <.icon name="hero-x-mark" class="size-4 mr-2" /> Cancel
+            </button>
+            <button
+              type="submit"
+              class={["btn btn-primary", @saving && "loading"]}
+              disabled={@saving}
+            >
+              <.icon :if={!@saving} name="hero-check" class="size-4 mr-2" /> {if @mode == :create,
+                do: "Create Provider",
+                else: "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    """
+  end
+
+  # Helper components
+  attr :title, :string, required: true
+  attr :value, :integer, required: true
+  attr :color, :string, default: "primary"
+
+  defp stat_card(assigns) do
+    ~H"""
+    <div class={["stat bg-base-100 rounded-lg shadow-sm border border-base-300"]}>
+      <div class="stat-title text-xs">{@title}</div>
+
+      <div class={["stat-value text-lg", "text-#{@color}"]}>{@value}</div>
+    </div>
+    """
+  end
+
+  # Health monitoring components
+  attr :metrics, :map, required: true
+  attr :loading, :boolean, default: false
+  attr :performing_bulk_health_check, :boolean, default: false
+
+  defp health_dashboard(assigns) do
+    ~H"""
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="card-title text-lg flex items-center gap-2">
+            <.icon name="hero-heart" class="size-5 text-red-500" /> System Health Overview
+          </h3>
+          <div class="flex items-center gap-2">
+            <div class={[
+              "badge badge-lg",
+              case @metrics.system_health_score do
+                score when score >= 90 -> "badge-success"
+                score when score >= 70 -> "badge-warning"
+                _ -> "badge-error"
+              end
+            ]}>
+              Health Score: {@metrics.system_health_score}%
+            </div>
+            <button
+              class={["btn btn-sm btn-outline", @performing_bulk_health_check && "loading"]}
+              phx-click="perform_bulk_health_check"
+              disabled={@performing_bulk_health_check || @loading}
+              title="Refresh health metrics for all providers"
+            >
+              <.icon :if={!@performing_bulk_health_check} name="hero-arrow-path" class="size-4" />
+              {if @performing_bulk_health_check, do: "Refreshing...", else: "Refresh"}
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="stat bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="stat-title text-green-700 text-xs">Online</div>
+            <div class="stat-value text-green-600 text-2xl">
+              {@metrics.health_distribution.online}
+            </div>
+            <div class="stat-desc text-green-600">{@metrics.health_percentages.online}% of total</div>
+          </div>
+
+          <div class="stat bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div class="stat-title text-yellow-700 text-xs">Degraded</div>
+            <div class="stat-value text-yellow-600 text-2xl">
+              {@metrics.health_distribution.degraded}
+            </div>
+            <div class="stat-desc text-yellow-600">
+              {@metrics.health_percentages.degraded}% of total
+            </div>
+          </div>
+
+          <div class="stat bg-red-50 border border-red-200 rounded-lg p-4">
+            <div class="stat-title text-red-700 text-xs">Offline</div>
+            <div class="stat-value text-red-600 text-2xl">{@metrics.health_distribution.offline}</div>
+            <div class="stat-desc text-red-600">{@metrics.health_percentages.offline}% of total</div>
+          </div>
+
+          <div class="stat bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="stat-title text-gray-700 text-xs">Unknown</div>
+            <div class="stat-value text-gray-600 text-2xl">
+              {@metrics.health_distribution.unknown}
+            </div>
+            <div class="stat-desc text-gray-600">{@metrics.health_percentages.unknown}% of total</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="stat bg-base-200 rounded-lg p-4">
+            <div class="stat-title text-xs">Total Providers</div>
+            <div class="stat-value text-lg">{@metrics.total_providers}</div>
+          </div>
+
+          <div class="stat bg-base-200 rounded-lg p-4">
+            <div class="stat-title text-xs">Enabled Providers</div>
+            <div class="stat-value text-lg">{@metrics.enabled_providers}</div>
+          </div>
+
+          <div class="stat bg-base-200 rounded-lg p-4">
+            <div class="stat-title text-xs">Avg Response Time</div>
+            <div class="stat-value text-lg">
+              {if @metrics.average_response_time_ms,
+                do: "#{Float.round(@metrics.average_response_time_ms, 1)}ms",
+                else: "N/A"}
+            </div>
+          </div>
+        </div>
+
+        <div class="text-xs text-gray-500 mt-4">
+          Last updated: {format_datetime(@metrics.last_updated)}
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr :metrics, :map, required: true
+  attr :loading, :boolean, default: false
+
+  defp health_metrics_detail(assigns) do
+    ~H"""
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="card-title text-xl flex items-center gap-2">
+            <.icon name="hero-chart-bar" class="size-6" /> Health Metrics: {@metrics.provider_name}
+          </h2>
+          <button
+            class="btn btn-sm btn-outline"
+            phx-click="back_to_list"
+          >
+            <.icon name="hero-arrow-left" class="size-4 mr-2" /> Back to List
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Current Status -->
+          <div class="card bg-base-200 shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title text-base mb-4">Current Status</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm">Health Status:</span>
+                  <.health_badge health_status={@metrics.health_status} />
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm">Last Check:</span>
+                  <span class="text-sm font-mono">{@metrics.last_check_display || "Never"}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm">Health Indicator:</span>
+                  <span class="text-lg">{@metrics.health_indicator}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+    <!-- Performance Metrics -->
+          <div class="card bg-base-200 shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title text-base mb-4">Performance</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm">Response Time:</span>
+                  <span class="text-sm font-mono">
+                    {if @metrics.response_time_ms, do: "#{@metrics.response_time_ms}ms", else: "N/A"}
+                  </span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm">Error Rate:</span>
+                  <span class="text-sm font-mono">
+                    {if @metrics.error_rate,
+                      do: "#{Float.round(@metrics.error_rate * 100, 2)}%",
+                      else: "0%"}
+                  </span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm">Uptime:</span>
+                  <span class="text-sm font-mono">
+                    {if @metrics.uptime_percentage,
+                      do: "#{Float.round(@metrics.uptime_percentage, 2)}%",
+                      else: "0%"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+    <!-- Reliability Metrics -->
+          <div class="card bg-base-200 shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title text-base mb-4">Reliability</h3>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm">Consecutive Failures:</span>
+                  <span class={[
+                    "text-sm font-mono",
+                    @metrics.consecutive_failures > 0 && "text-error"
+                  ]}>
+                    {@metrics.consecutive_failures}
+                  </span>
+                </div>
+                <div :if={@metrics.last_error} class="space-y-2">
+                  <span class="text-sm">Last Error:</span>
+                  <div class="text-xs bg-error/10 text-error p-2 rounded border">
+                    {@metrics.last_error}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+    <!-- Health Actions -->
+        <div class="flex gap-3 mt-6">
+          <button
+            class="btn btn-success btn-sm"
+            phx-click="perform_health_check"
+            phx-value-provider_id={@metrics.provider_id}
+          >
+            <.icon name="hero-heart" class="size-4 mr-2" /> Run Health Check
+          </button>
+          <button
+            class="btn btn-outline btn-sm"
+            phx-click="update_health_status"
+            phx-value-provider_id={@metrics.provider_id}
+            phx-value-status="online"
+          >
+            Mark as Online
+          </button>
+          <button
+            class="btn btn-warning btn-sm"
+            phx-click="update_health_status"
+            phx-value-provider_id={@metrics.provider_id}
+            phx-value-status="degraded"
+          >
+            Mark as Degraded
+          </button>
+          <button
+            class="btn btn-error btn-sm"
+            phx-click="update_health_status"
+            phx-value-provider_id={@metrics.provider_id}
+            phx-value-status="offline"
+          >
+            Mark as Offline
+          </button>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr :type, :atom, required: true
+
+  defp type_badge(assigns) do
+    ~H"""
+    <span class={[
+      "badge badge-sm",
+      case @type do
+        :cloud -> "badge-info"
+        :local -> "badge-warning"
+        :enterprise -> "badge-success"
+        :custom -> "badge-secondary"
+        _ -> "badge-neutral"
+      end
+    ]}>
+      {String.capitalize(to_string(@type))}
+    </span>
+    """
+  end
+
+  attr :enabled, :boolean, required: true
+
+  defp status_badge(assigns) do
+    ~H"""
+    <span class={[
+      "badge badge-sm",
+      if(@enabled, do: "badge-success", else: "badge-error")
+    ]}>
+      {if @enabled, do: "Enabled", else: "Disabled"}
+    </span>
+    """
+  end
+
+  attr :health_status, :atom, required: true
+
+  defp health_badge(assigns) do
+    ~H"""
+    <span class={[
+      "badge badge-sm",
+      case @health_status do
+        :online -> "badge-success"
+        :degraded -> "badge-warning"
+        :offline -> "badge-error"
+        _ -> "badge-neutral"
+      end
+    ]}>
+      {case @health_status do
+        :online -> "🟢 Online"
+        :degraded -> "🟡 Degraded"
+        :offline -> "🔴 Offline"
+        _ -> "⚪ Unknown"
+      end}
+    </span>
+    """
+  end
+
+  defp format_auth_type(nil), do: "None"
+  defp format_auth_type(:none), do: "None"
+  defp format_auth_type(:api_key), do: "API Key"
+  defp format_auth_type(:oauth2), do: "OAuth2"
+  defp format_auth_type(:custom_header), do: "Custom Headers"
+  defp format_auth_type(type), do: String.capitalize(to_string(type))
+
+  # Helper function to mask credentials in forms
+  defp mask_credential(nil), do: ""
+
+  defp mask_credential(credential) when is_binary(credential) do
+    # Don't show any part of the credential in forms for security
+    if String.length(credential) > 0 do
+      "••••••••••••••••"
+    else
+      ""
+    end
+  end
+
+  # Helper function to format JSON fields for display
+  defp format_json_field(nil), do: ""
+
+  defp format_json_field(map) when is_map(map) do
+    case Jason.encode(map, pretty: true) do
+      {:ok, json} -> json
+      {:error, _} -> ""
+    end
+  end
+
+  defp format_json_field(_), do: ""
+
+  # Helper function to format tags for display
+  defp format_tags(nil), do: ""
+  defp format_tags([]), do: ""
+
+  defp format_tags(tags) when is_list(tags) do
+    tags
+    |> Enum.map(&to_string/1)
+    |> Enum.join(", ")
+  end
+
+  defp format_tags(_), do: ""
+
+  # Helper functions for form data formatting
+  defp format_json_field(nil), do: ""
+
+  defp format_json_field(value) when is_map(value) do
+    case Jason.encode(value, pretty: true) do
+      {:ok, json} -> json
+      {:error, _} -> ""
+    end
+  end
+
+  defp format_json_field(_), do: ""
+
+  defp mask_credential(nil), do: ""
+  defp mask_credential(""), do: ""
+
+  defp mask_credential(credential) when is_binary(credential) do
+    # Show first 4 and last 4 characters, mask the middle
+    case String.length(credential) do
+      len when len <= 8 ->
+        String.duplicate("*", len)
+
+      len ->
+        first = String.slice(credential, 0, 4)
+        last = String.slice(credential, -4, 4)
+        middle = String.duplicate("*", len - 8)
+        "#{first}#{middle}#{last}"
+    end
+  end
+
+  defp mask_credential(_), do: ""
+
+  defp format_tags(nil), do: ""
+  defp format_tags([]), do: ""
+
+  defp format_tags(tags) when is_list(tags) do
+    tags
+    |> Enum.map(&to_string/1)
+    |> Enum.join(", ")
+  end
+
+  defp format_tags(_), do: ""
+
+  defp format_models(nil), do: ""
+  defp format_models([]), do: ""
+
+  defp format_models(models) when is_list(models) do
+    Enum.join(models, ", ")
+  end
+
+  defp format_models(_), do: ""
+
+  # Helper function to format datetime for display
+  defp format_datetime(nil), do: nil
+
+  defp format_datetime(%DateTime{} = dt) do
+    dt
+    |> DateTime.to_string()
+    |> String.replace("T", " ")
+    |> String.replace("Z", " UTC")
+  end
+
+  defp format_datetime(%NaiveDateTime{} = dt) do
+    NaiveDateTime.to_string(dt)
+  end
+
+  defp format_datetime(timestamp) when is_binary(timestamp), do: timestamp
+
+  # Helper function to get health indicator emoji
+  defp get_health_indicator(:online), do: "🟢"
+  defp get_health_indicator(:degraded), do: "🟡"
+  defp get_health_indicator(:offline), do: "🔴"
+  defp get_health_indicator(_), do: "⚪"
+
+  # Analytics Dashboard Component
+  attr :analytics, :map, required: true
+  attr :loading, :boolean, default: false
+  attr :view_mode, :atom, default: :overview
+
+  defp analytics_dashboard(assigns) do
+    ~H"""
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900">Provider Analytics</h3>
+          <p class="text-sm text-gray-600">Comprehensive insights into provider usage, costs, and performance</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="btn-group">
+            <button
+              class={["btn btn-sm", @view_mode == :overview && "btn-active"]}
+              phx-click="set_analytics_view"
+              phx-value-view="overview"
+            >
+              Overview
+            </button>
+            <button
+              class={["btn btn-sm", @view_mode == :usage && "btn-active"]}
+              phx-click="set_analytics_view"
+              phx-value-view="usage"
+            >
+              Usage
+            </button>
+            <button
+              class={["btn btn-sm", @view_mode == :costs && "btn-active"]}
+              phx-click="set_analytics_view"
+              phx-value-view="costs"
+            >
+              Costs
+            </button>
+            <button
+              class={["btn btn-sm", @view_mode == :performance && "btn-active"]}
+              phx-click="set_analytics_view"
+              phx-value-view="performance"
+            >
+              Performance
+            </button>
+          </div>
+          <button
+            class={["btn btn-sm btn-outline", @loading && "loading"]}
+            phx-click="refresh_analytics"
+            disabled={@loading}
+            title="Refresh analytics data"
+          >
+            <.icon :if={!@loading} name="hero-arrow-path" class="size-4" />
+          </button>
+        </div>
+      </div>
+
+      <div :if={@loading} class="flex items-center justify-center py-12">
+        <div class="loading loading-spinner loading-lg"></div>
+        <span class="ml-3 text-gray-600">Loading analytics...</span>
+      </div>
+
+      <div :if={!@loading} class="space-y-6">
+        <!-- Overview Analytics -->
+        <div :if={@view_mode == :overview}>
+          <.analytics_overview analytics={@analytics} />
+        </div>
+
+        <!-- Usage Analytics -->
+        <div :if={@view_mode == :usage}>
+          <.analytics_usage analytics={@analytics.usage_analytics} />
+        </div>
+
+        <!-- Cost Analytics -->
+        <div :if={@view_mode == :costs}>
+          <.analytics_costs analytics={@analytics.cost_analytics} />
+        </div>
+
+        <!-- Performance Analytics -->
+        <div :if={@view_mode == :performance}>
+          <.analytics_performance analytics={@analytics.performance_metrics} />
+        </div>
+      </div>
+
+      <div class="mt-4 text-xs text-gray-500 text-right">
+        Last updated: <%= format_datetime(@analytics.last_updated) %>
+      </div>
+    </div>
+    """
+  end
+
+  # Analytics Overview Component
+  attr :analytics, :map, required: true
+
+  defp analytics_overview(assigns) do
+    ~H"""
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Basic Statistics -->
+      <div class="space-y-4">
+        <h4 class="font-medium text-gray-900">Provider Summary</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <.stat_card title="Total Providers" value={@analytics.basic_stats.total} color="primary" />
+          <.stat_card title="Active" value={@analytics.basic_stats.enabled} color="success" />
+          <.stat_card title="Inactive" value={@analytics.basic_stats.disabled} color="warning" />
+          <.stat_card
+            title="Health Score"
+            value={"#{Float.round(@analytics.performance_metrics.health_distribution |> calculate_health_score(), 1)}%"}
+            color="info"
+          />
+        </div>
+      </div>
+
+      <!-- Usage Trends -->
+      <div class="space-y-4">
+        <h4 class="font-medium text-gray-900">Usage Trends</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <.stat_card
+            title="Utilization"
+            value={"#{@analytics.usage_analytics.utilization_rate}%"}
+            color="info"
+          />
+          <.stat_card
+            title="Recent Additions"
+            value={@analytics.trends.recent_additions}
+            color="success"
+          />
+          <.stat_card
+            title="Recent Updates"
+            value={@analytics.trends.recent_updates}
+            color="warning"
+          />
+          <.stat_card
+            title="Growth Rate"
+            value={"#{Map.get(@analytics.trends.growth_metrics, :growth_rate, 0)}%"}
+            color="accent"
+          />
+        </div>
+      </div>
+
+      <!-- Cost Summary -->
+      <div class="space-y-4">
+        <h4 class="font-medium text-gray-900">Cost Overview</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <.stat_card
+            title="Monthly Subscriptions"
+            value={"$#{Float.round(@analytics.cost_analytics.total_subscription_cost, 2)}"}
+            color="primary"
+          />
+          <.stat_card
+            title="Token-based"
+            value={@analytics.cost_analytics.token_based_count}
+            color="info"
+          />
+          <.stat_card
+            title="Request-based"
+            value={@analytics.cost_analytics.request_based_count}
+            color="secondary"
+          />
+          <.stat_card
+            title="Subscription"
+            value={@analytics.cost_analytics.subscription_count}
+            color="accent"
+          />
+        </div>
+      </div>
+
+      <!-- Performance Summary -->
+      <div class="space-y-4">
+        <h4 class="font-medium text-gray-900">Performance Overview</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <.stat_card
+            title="Avg Response Time"
+            value={format_response_time(@analytics.performance_metrics.avg_response_time)}
+            color="info"
+          />
+          <.stat_card
+            title="Uptime"
+            value={"#{Float.round(@analytics.performance_metrics.uptime_percentage, 1)}%"}
+            color="success"
+          />
+          <.stat_card
+            title="Error Rate"
+            value={"#{Float.round(@analytics.performance_metrics.error_rate * 100, 2)}%"}
+            color="warning"
+          />
+          <.stat_card
+            title="Online Providers"
+            value={Map.get(@analytics.performance_metrics.health_distribution, :online, 0)}
+            color="success"
+          />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Analytics Usage Component
+  attr :analytics, :map, required: true
+
+  defp analytics_usage(assigns) do
+    ~H"""
+    <div class="space-y-6">
+      <!-- Provider Type Distribution -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Provider Type Distribution</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <%= for {type, data} <- @analytics.type_distribution do %>
+            <.stat_card
+              title={String.capitalize(to_string(type))}
+              value={"#{data.count} (#{data.percentage}%)"}
+              color="primary"
+            />
+          <% end %>
+        </div>
+      </div>
+
+      <!-- Authentication Methods -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Authentication Methods</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <%= for {auth_type, data} <- @analytics.auth_method_usage do %>
+            <.stat_card
+              title={format_auth_type(auth_type)}
+              value={"#{data.count} (#{data.percentage}%)"}
+              color="info"
+            />
+          <% end %>
+        </div>
+      </div>
+
+      <!-- Configuration Completeness -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Configuration Completeness</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <.stat_card
+            title="Complete Config"
+            value={"#{@analytics.config_completeness.complete_config.percentage}%"}
+            color="success"
+          />
+          <.stat_card
+            title="Has Authentication"
+            value={"#{@analytics.config_completeness.has_authentication.percentage}%"}
+            color="info"
+          />
+          <.stat_card
+            title="Has Rate Limits"
+            value={"#{@analytics.config_completeness.has_rate_limits.percentage}%"}
+            color="warning"
+          />
+          <.stat_card
+            title="Has Cost Config"
+            value={"#{@analytics.config_completeness.has_cost_config.percentage}%"}
+            color="accent"
+          />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Analytics Costs Component
+  attr :analytics, :map, required: true
+
+  defp analytics_costs(assigns) do
+    ~H"""
+    <div class="space-y-6">
+      <!-- Cost Summary -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Cost Summary</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <.stat_card
+            title="Total Subscriptions"
+            value={"$#{Float.round(@analytics.total_subscription_cost, 2)}"}
+            color="primary"
+          />
+          <.stat_card
+            title="Avg Token Cost"
+            value={"$#{Float.round(@analytics.avg_token_cost, 4)}"}
+            color="info"
+          />
+          <.stat_card
+            title="Avg Request Cost"
+            value={"$#{Float.round(@analytics.avg_request_cost, 4)}"}
+            color="secondary"
+          />
+          <.stat_card
+            title="Cost Efficiency"
+            value={Float.round(@analytics.cost_efficiency, 2)}
+            color="accent"
+          />
+        </div>
+      </div>
+
+      <!-- Cost by Provider Type -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Cost by Provider Type</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <%= for {type, data} <- @analytics.cost_by_type do %>
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h5 class="font-medium text-gray-900 capitalize"><%= type %></h5>
+              <p class="text-2xl font-bold text-primary">$<%= Float.round(data.total_cost, 2) %></p>
+              <p class="text-sm text-gray-600"><%= data.provider_count %> providers</p>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Analytics Performance Component
+  attr :analytics, :map, required: true
+
+  defp analytics_performance(assigns) do
+    ~H"""
+    <div class="space-y-6">
+      <!-- Performance Metrics -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Performance Metrics</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <.stat_card
+            title="Avg Response Time"
+            value={format_response_time(@analytics.avg_response_time)}
+            color="info"
+          />
+          <.stat_card
+            title="Min Response Time"
+            value={format_response_time(@analytics.min_response_time)}
+            color="success"
+          />
+          <.stat_card
+            title="Max Response Time"
+            value={format_response_time(@analytics.max_response_time)}
+            color="warning"
+          />
+          <.stat_card
+            title="Avg Uptime"
+            value={"#{Float.round(@analytics.uptime_percentage, 1)}%"}
+            color="success"
+          />
+        </div>
+      </div>
+
+      <!-- Health Distribution -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Health Status Distribution</h4>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <%= for {status, count} <- @analytics.health_distribution do %>
+            <.stat_card
+              title={String.capitalize(to_string(status))}
+              value={count}
+              color={health_status_color(status)}
+            />
+          <% end %>
+        </div>
+      </div>
+
+      <!-- Performance by Type -->
+      <div>
+        <h4 class="font-medium text-gray-900 mb-4">Performance by Provider Type</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <%= for {type, data} <- @analytics.performance_by_type do %>
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h5 class="font-medium text-gray-900 capitalize"><%= type %></h5>
+              <div class="mt-2 space-y-1">
+                <p class="text-sm text-gray-600">
+                  Online: <%= data.online_count %>/<%= data.total_count %>
+                </p>
+                <p class="text-sm text-gray-600">
+                  Avg Response: <%= format_response_time(data.avg_response_time) %>
+                </p>
+                <p class="text-sm text-gray-600">
+                  Uptime: <%= Float.round(data.avg_uptime, 1) %>%
+                </p>
+                <p class="text-sm text-gray-600">
+                  Health Score: <%= Float.round(data.health_score, 1) %>%
+                </p>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Helper functions for analytics
+
+  defp calculate_health_score(health_distribution) do
+    total = health_distribution |> Map.values() |> Enum.sum()
+    if total == 0 do
+      0.0
+    else
+      online = Map.get(health_distribution, :online, 0)
+      degraded = Map.get(health_distribution, :degraded, 0)
+      (online + degraded * 0.5) / total * 100
+    end
+  end
+
+  defp format_response_time(nil), do: "N/A"
+  defp format_response_time(time) when is_number(time) do
+    cond do
+      time < 1000 -> "#{round(time)}ms"
+      time < 60000 -> "#{Float.round(time / 1000, 1)}s"
+      true -> "#{Float.round(time / 60000, 1)}m"
+    end
+  end
+
+  defp format_auth_type(:none), do: "None"
+  defp format_auth_type(:api_key), do: "API Key"
+  defp format_auth_type(:oauth2), do: "OAuth2"
+  defp format_auth_type(:custom_header), do: "Custom Headers"
+  defp format_auth_type(type), do: String.capitalize(to_string(type))
+
+  defp health_status_color(:online), do: "success"
+  defp health_status_color(:degraded), do: "warning"
+  defp health_status_color(:offline), do: "error"
+  defp health_status_color(_), do: "neutral"
+end

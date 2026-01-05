@@ -8,6 +8,20 @@ import topbar from "../vendor/topbar"
 // Import accessibility hooks
 import AccessibilityHooks from "./admin_accessibility_hooks"
 
+// Import admin profiles hooks
+import { AutoDismissFlash, FormKeyboardShortcuts } from "./admin_profiles_hooks"
+
+// Import admin providers hooks
+import { 
+  AutoDismissFlash as ProviderAutoDismissFlash, 
+  RealTimeValidation, 
+  LoadingStateManager, 
+  ConnectionTestDisplay, 
+  FormKeyboardShortcuts as ProviderFormKeyboardShortcuts, 
+  ErrorDisplay,
+  GlobalHelpHandler
+} from "./admin_providers_hooks"
+
 // ----------------------------------------------------------------------------
 // LiveView Hooks
 // ----------------------------------------------------------------------------
@@ -414,6 +428,19 @@ const Hooks = {
 
   // Add accessibility hooks
   ...AccessibilityHooks,
+
+  // Add admin profiles hooks
+  AutoDismissFlash,
+  FormKeyboardShortcuts,
+
+  // Add admin providers hooks
+  ProviderAutoDismissFlash,
+  RealTimeValidation,
+  LoadingStateManager,
+  ConnectionTestDisplay,
+  ProviderFormKeyboardShortcuts,
+  ErrorDisplay,
+  GlobalHelpHandler,
 
   // Admin Dashboard Micro-interactions
   AdminMicroInteractions: {

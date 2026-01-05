@@ -38,8 +38,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
         >
           <!-- Background -->
           <rect width="800" height="1600" fill="transparent" />
-
-          <!-- Definitions -->
+          
+    <!-- Definitions -->
           <defs>
             <!-- Arrow marker -->
             <marker
@@ -56,19 +56,19 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
                 class="fill-current text-base-content/50"
               />
             </marker>
-
-            <!-- Node shadow -->
+            
+    <!-- Node shadow -->
             <filter id={"node-shadow-#{@id}"} x="-50%" y="-50%" width="200%" height="200%">
               <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25" />
             </filter>
           </defs>
-
-          <!-- Edges (render first so they appear behind nodes) -->
+          
+    <!-- Edges (render first so they appear behind nodes) -->
           <%= for edge <- @edges do %>
             <.workflow_edge edge={edge} marker_id={"arrowhead-#{@id}"} />
           <% end %>
-
-          <!-- Nodes -->
+          
+    <!-- Nodes -->
           <%= for node <- @nodes do %>
             <.workflow_node
               node={node}
@@ -79,8 +79,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
             />
           <% end %>
         </svg>
-
-        <!-- Execution Progress Summary -->
+        
+    <!-- Execution Progress Summary -->
         <%= if has_execution_progress?(@execution_state) do %>
           <div class="mt-4 p-3 bg-base-100 rounded-lg border border-base-300">
             <div class="flex items-center justify-between text-sm">
@@ -108,8 +108,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
             <% end %>
           </div>
         <% end %>
-
-        <!-- Tooltips -->
+        
+    <!-- Tooltips -->
         <div class="workflow-tooltips">
           <%= for node <- @nodes do %>
             <div
@@ -293,8 +293,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
           />
         <% end %>
       <% end %>
-
-      <!-- Node label (below node, up to 2 lines) -->
+      
+    <!-- Node label (below node, up to 2 lines) -->
       <text
         x={@node.x}
         y={@node.y + 62}
@@ -308,8 +308,8 @@ defmodule AgentWebWeb.WorkflowGraphComponent do
           </tspan>
         <% end %>
       </text>
-
-      <!-- Status indicators -->
+      
+    <!-- Status indicators -->
       <%= cond do %>
         <% @node_status == :running -> %>
           <circle cx={@node.x + 26} cy={@node.y - 26} r="9" class="fill-warning animate-pulse" />

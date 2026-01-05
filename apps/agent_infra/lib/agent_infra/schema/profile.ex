@@ -7,7 +7,7 @@ defmodule AgentInfra.Schema.Profile do
     field(:name, :string)
     field(:enabled, :boolean, default: true)
 
-    field(:provider, :string)
+    field(:provider_id, :string)
     field(:model, :string)
     field(:policy_version, :string)
 
@@ -26,7 +26,7 @@ defmodule AgentInfra.Schema.Profile do
       :id,
       :name,
       :enabled,
-      :provider,
+      :provider_id,
       :model,
       :policy_version,
       :generation,
@@ -35,6 +35,6 @@ defmodule AgentInfra.Schema.Profile do
       :stop_list,
       :tags
     ])
-    |> validate_required([:id, :provider, :model, :enabled])
+    |> validate_required([:id, :provider_id, :model, :enabled])
   end
 end

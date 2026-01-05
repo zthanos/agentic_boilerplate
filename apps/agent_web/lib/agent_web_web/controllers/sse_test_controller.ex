@@ -29,7 +29,12 @@ defmodule AgentWebWeb.SseTestController do
     end)
 
     # Send done event
-    {:ok, conn} = SseManager.send_event(conn, StreamEvent.done("test_run", "test_trace", "test_fp", 2500, %{}))
+    {:ok, conn} =
+      SseManager.send_event(
+        conn,
+        StreamEvent.done("test_run", "test_trace", "test_fp", 2500, %{})
+      )
+
     Logger.info("[SSETest] Sent done event")
 
     # Send close event

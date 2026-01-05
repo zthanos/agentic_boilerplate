@@ -24,6 +24,7 @@ defmodule AgentWebWeb.AdminSidebar do
     ],
     management: [
       %{key: :settings, label: "Settings", href: "/admin/settings", icon: "hero-cog-6-tooth"},
+      %{key: :providers, label: "Providers", href: "/admin/providers", icon: "hero-server-stack"},
       %{key: :profiles, label: "Profiles", href: "/admin/profiles", icon: "hero-users"},
       %{key: :agents, label: "Agents", href: "/admin/agents", icon: "hero-cpu-chip"},
       %{key: :workflows, label: "Workflows", href: "/admin/workflows", icon: "hero-squares-2x2"},
@@ -92,7 +93,7 @@ defmodule AgentWebWeb.AdminSidebar do
             <.icon name="hero-x-mark" class="size-5" />
           </button>
         </div>
-        
+
     <!-- Breadcrumbs -->
         <div :if={!@collapsed} class="px-4 py-3 border-b border-base-300">
           <nav class="text-sm" aria-label="Breadcrumb">
@@ -106,7 +107,7 @@ defmodule AgentWebWeb.AdminSidebar do
             </ol>
           </nav>
         </div>
-        
+
     <!-- Navigation Content -->
         <nav class="p-4 space-y-6 flex-1 overflow-y-auto">
           <div class="space-y-2">
@@ -166,7 +167,7 @@ defmodule AgentWebWeb.AdminSidebar do
             </a>
           </div>
         </nav>
-        
+
     <!-- Toggle Button -->
         <div class="p-4 border-t border-gray-200">
           <button

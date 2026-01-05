@@ -37,38 +37,42 @@ defmodule AgentWebWeb.AgentExecuteController do
 
         Logger.info("[Controller] Starting stream_with_events...")
 
-        result = SseManager.stream_with_events(conn, fn on_chunk, on_workflow_progress ->
-          Logger.info("[Controller] Stream function invoked, callbacks ready")
-          Logger.info("[Controller] Calling AgentExecutor.execute_agent_stream...")
+        result =
+          SseManager.stream_with_events(conn, fn on_chunk, on_workflow_progress ->
+            Logger.info("[Controller] Stream function invoked, callbacks ready")
+            Logger.info("[Controller] Calling AgentExecutor.execute_agent_stream...")
 
-          try do
-            result = AgentExecutor.execute_agent_stream(
-              profile,
-              overrides,
-              runtime_input,
-              exec_meta,
-              on_chunk,
-              on_workflow_progress,
-              agent_id: agent_id,
-              agent_version: agent_version
-            )
-            Logger.info("[Controller] AgentExecutor completed: #{inspect(elem(result, 0))}")
-            result
-          rescue
-            e ->
-              Logger.error("[Controller] AgentExecutor EXCEPTION: #{inspect(e)}")
-              Logger.error("[Controller] Exception message: #{Exception.message(e)}")
-              Logger.error("[Controller] Stacktrace: #{inspect(__STACKTRACE__)}")
-              {:error, %{reason: "agent_executor_exception", detail: Exception.message(e)}}
-          catch
-            :exit, reason ->
-              Logger.error("[Controller] AgentExecutor EXIT: #{inspect(reason)}")
-              {:error, %{reason: "agent_executor_exit", detail: inspect(reason)}}
-            :throw, value ->
-              Logger.error("[Controller] AgentExecutor THROW: #{inspect(value)}")
-              {:error, %{reason: "agent_executor_throw", detail: inspect(value)}}
-          end
-        end)
+            try do
+              result =
+                AgentExecutor.execute_agent_stream(
+                  profile,
+                  overrides,
+                  runtime_input,
+                  exec_meta,
+                  on_chunk,
+                  on_workflow_progress,
+                  agent_id: agent_id,
+                  agent_version: agent_version
+                )
+
+              Logger.info("[Controller] AgentExecutor completed: #{inspect(elem(result, 0))}")
+              result
+            rescue
+              e ->
+                Logger.error("[Controller] AgentExecutor EXCEPTION: #{inspect(e)}")
+                Logger.error("[Controller] Exception message: #{Exception.message(e)}")
+                Logger.error("[Controller] Stacktrace: #{inspect(__STACKTRACE__)}")
+                {:error, %{reason: "agent_executor_exception", detail: Exception.message(e)}}
+            catch
+              :exit, reason ->
+                Logger.error("[Controller] AgentExecutor EXIT: #{inspect(reason)}")
+                {:error, %{reason: "agent_executor_exit", detail: inspect(reason)}}
+
+              :throw, value ->
+                Logger.error("[Controller] AgentExecutor THROW: #{inspect(value)}")
+                {:error, %{reason: "agent_executor_throw", detail: inspect(value)}}
+            end
+          end)
 
         Logger.info("[Controller] stream_with_events completed")
         result

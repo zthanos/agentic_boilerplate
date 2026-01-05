@@ -22,7 +22,15 @@ defmodule AgentRuntime.Llm.AgentExecutor do
     end
   end
 
-  def execute_agent_stream(profile, overrides, input, exec_meta, on_chunk, on_workflow_progress, opts \\ []) do
+  def execute_agent_stream(
+        profile,
+        overrides,
+        input,
+        exec_meta,
+        on_chunk,
+        on_workflow_progress,
+        opts \\ []
+      ) do
     agent_id = Keyword.fetch!(opts, :agent_id)
     agent_version = Keyword.get(opts, :agent_version, :latest)
 

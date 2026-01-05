@@ -109,8 +109,8 @@ defmodule AgentInfra.StoreEcto.ProfileStore do
   end
 
   @impl ProfileStore
-  def list_by_provider(provider) when is_atom(provider) do
-    query = from(p in Profile, where: p.provider == ^to_string(provider))
+  def list_by_provider(provider_id) when is_binary(provider_id) or is_integer(provider_id) do
+    query = from(p in Profile, where: p.provider_id == ^to_string(provider_id))
 
     try do
       profiles =
@@ -199,7 +199,7 @@ defmodule AgentInfra.StoreEcto.ProfileStore do
       id: profile.id && to_string(profile.id),
       name: profile.name,
       enabled: profile.enabled,
-      provider: to_string(profile.provider),
+      provider_id: to_string(profile.provider_id),
       model: to_string(profile.model),
       policy_version: profile.policy_version,
       generation: GenerationParams.to_map(profile.generation),
@@ -215,7 +215,7 @@ defmodule AgentInfra.StoreEcto.ProfileStore do
       id: schema.id,
       name: schema.name,
       enabled: schema.enabled,
-      provider: String.to_existing_atom(schema.provider),
+      provider_id: schema.provider_id,
       model: schema.model,
       policy_version: schema.policy_version,
       generation: GenerationParams.from_map(schema.generation || %{}),
@@ -239,8 +239,8 @@ defmodule AgentInfra.StoreEcto.ProfileStore do
       {:enabled, enabled}, q ->
         from(p in q, where: p.enabled == ^enabled)
 
-      {:provider, provider}, q ->
-        from(p in q, where: p.provider == ^to_string(provider))
+      {:provider, provider_id}, q ->
+        from(p in q, where: p.provider_id == ^to_string(provider_id))
 
       {:tags, tags}, q when is_list(tags) ->
         # PostgreSQL array overlap operator

@@ -6,12 +6,12 @@ defmodule AgentCore.Llm.LLMProfile do
   alias AgentCore.Llm.{Provider, ModelRef, GenerationParams, Budgets}
 
   # Για profile που αποθηκεύεται σε DB, συνήθως ΔΕΝ enforce-άρεις :id
-  @enforce_keys [:name, :provider, :model]
+  @enforce_keys [:name, :provider_id, :model]
   defstruct [
     :id,
     :name,
     enabled: true,
-    provider: nil,
+    provider_id: nil,  # References provider ID from database
     model: nil,
     policy_version: nil,
     generation: %GenerationParams{},
@@ -24,12 +24,13 @@ defmodule AgentCore.Llm.LLMProfile do
   ]
 
   @type id :: String.t() | integer()
+  @type provider_id :: String.t() | integer()  # References database provider ID
 
   @type t :: %__MODULE__{
           id: id() | nil,
           name: String.t(),
           enabled: boolean(),
-          provider: Provider.t(),
+          provider_id: provider_id(),  # References database provider ID
           model: ModelRef.t(),
           policy_version: String.t() | nil,
           generation: GenerationParams.t(),

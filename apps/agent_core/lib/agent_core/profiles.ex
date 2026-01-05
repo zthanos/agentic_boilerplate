@@ -9,12 +9,12 @@ defmodule AgentCore.Profiles do
 
   alias AgentCore.Profiles.{GenerationParams, Budgets}
 
-  @enforce_keys [:name, :provider, :model]
+  @enforce_keys [:name, :provider_id, :model]
   defstruct [
     :id,
     :name,
     enabled: true,
-    provider: nil,
+    provider_id: nil,  # References provider ID from database
     model: nil,
     policy_version: nil,
     generation: %GenerationParams{},
@@ -27,14 +27,14 @@ defmodule AgentCore.Profiles do
   ]
 
   @type id :: String.t() | integer()
-  @type provider_type :: atom()
+  @type provider_id :: String.t() | integer()  # References database provider ID
   @type model_ref :: String.t() | atom()
 
   @type t :: %__MODULE__{
           id: id() | nil,
           name: String.t(),
           enabled: boolean(),
-          provider: provider_type(),
+          provider_id: provider_id(),  # References database provider ID
           model: model_ref(),
           policy_version: String.t() | nil,
           generation: GenerationParams.t(),
@@ -60,7 +60,7 @@ defmodule AgentCore.Profiles do
   """
   @spec new(map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_map(attrs) do
-    required_fields = [:name, :provider, :model]
+    required_fields = [:name, :provider_id, :model]
 
     case validate_required_fields(attrs, required_fields) do
       :ok ->
@@ -103,7 +103,7 @@ defmodule AgentCore.Profiles do
   @spec resolve_config(t()) :: map()
   def resolve_config(%__MODULE__{} = profile) do
     %{
-      provider: profile.provider,
+      provider_id: profile.provider_id,
       model: profile.model,
       generation_params: GenerationParams.to_map(profile.generation),
       budgets: Budgets.to_map(profile.budgets),
@@ -170,7 +170,7 @@ defmodule AgentCore.Profiles do
 
   defp validate_profile_attrs(attrs) do
     with :ok <- validate_name(attrs[:name]),
-         :ok <- validate_provider(attrs[:provider]),
+         :ok <- validate_provider_id(attrs[:provider_id]),
          :ok <- validate_model(attrs[:model]),
          :ok <- validate_tools(attrs[:tools]),
          :ok <- validate_stop_list(attrs[:stop_list]),
@@ -182,8 +182,8 @@ defmodule AgentCore.Profiles do
   defp validate_name(name) when is_binary(name) and byte_size(name) > 0, do: :ok
   defp validate_name(_), do: {:error, :invalid_name}
 
-  defp validate_provider(provider) when is_atom(provider), do: :ok
-  defp validate_provider(_), do: {:error, :invalid_provider}
+  defp validate_provider_id(provider_id) when is_binary(provider_id) or is_integer(provider_id), do: :ok
+  defp validate_provider_id(_), do: {:error, :invalid_provider_id}
 
   defp validate_model(model) when is_binary(model) or is_atom(model), do: :ok
   defp validate_model(_), do: {:error, :invalid_model}

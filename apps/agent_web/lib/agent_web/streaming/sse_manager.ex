@@ -84,9 +84,7 @@ defmodule AgentWeb.Streaming.SseManager do
         status = phase_to_status(phase)
         opts = build_step_opts(step_id, meta)
 
-        Logger.debug(
-          "[SSE] Step event: #{step_name} -> #{status}, opts=#{inspect(opts)}"
-        )
+        Logger.debug("[SSE] Step event: #{step_name} -> #{status}, opts=#{inspect(opts)}")
 
         event = StreamEvent.step_execution(step_name, status, opts)
 
@@ -209,9 +207,7 @@ defmodule AgentWeb.Streaming.SseManager do
 
         # Callback for workflow step progress
         on_workflow_progress = fn step_id, phase, meta ->
-          Logger.debug(
-            "[SSE Task] Workflow progress: #{inspect(step_id)} -> #{inspect(phase)}"
-          )
+          Logger.debug("[SSE Task] Workflow progress: #{inspect(step_id)} -> #{inspect(phase)}")
 
           send(parent, {:sse_step_execution, step_id, phase, meta || %{}})
           :ok

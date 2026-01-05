@@ -1,37 +1,10 @@
 defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
   @moduledoc """
-  Step to generate final LLM responses using enhanced prompts.
+  Step to generate final LLM responses with real-time token streaming.
 
-  This step takes enhanced prompts (which include original user messages augmented
-  with relevant historical context) and generates final responses using the LLM.
-  It handles response formatting, metadata collection, and workflow-specific error
-  handling for conversation completion.
-
-  ## Input
-
-  Expects:
-  - `ctx.artifacts[:enhanced_prompt]` - The enhanced prompt from previous step
-  - `user_message` from workflow input - The original user message
-  - `profile` - LLM profile for response generation
-  - `overrides` - LLM overrides for execution
-
-  ## Output
-
-  Sets `ctx.artifacts[:final_response]` with the generated response and
-  `ctx.artifacts[:response_metadata]` with generation metadata.
-
-  ## Response Generation Logic
-
-  Uses LLM to generate responses based on enhanced prompts. The step:
-  - Validates that enhanced prompt is available
-  - Configures appropriate LLM parameters for response generation
-  - Handles generation errors with workflow-specific fallback behavior
-  - Collects metadata about response generation for observability
-
-  ## Workflow Independence
-
-  This implementation uses core LLM infrastructure but maintains workflow-specific
-  error handling patterns and response formatting independent of plan system modules.
+  This step generates responses using the LLM with token-by-token streaming
+  for real-time UI updates. It handles both streaming and non-streaming modes
+  based on whether the on_chunk callback is provided.
   """
 
   @behaviour AgentCore.WorkflowEngine.Step
@@ -53,19 +26,19 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
     # Normalize user_message to handle nil values
     normalized_user_message = if is_binary(user_message), do: user_message, else: ""
 
+    # Decide whether to use streaming based on callback availability
+    use_streaming = is_function(on_chunk, 1)
+
     case generate_final_response(
            enhanced_prompt,
            normalized_user_message,
            profile,
            overrides,
+           on_chunk,
+           use_streaming,
            opts
          ) do
       {:ok, response, response_metadata} ->
-        # Stream the response to the UI if callback is available
-        if is_function(on_chunk, 1) do
-          on_chunk.(response)
-        end
-
         updated_ctx =
           ctx
           |> AgentCore.WorkflowEngine.Context.put_artifact(:final_response, response)
@@ -76,7 +49,8 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
           response_length: String.length(response),
           enhanced_prompt_length: String.length(enhanced_prompt || ""),
           original_message_length: String.length(normalized_user_message),
-          generation_metadata: response_metadata
+          generation_metadata: response_metadata,
+          streaming_used: use_streaming
         }
 
         {:ok, updated_ctx, output}
@@ -87,7 +61,7 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
         # Generate fallback response on error
         fallback_response = generate_fallback_response(normalized_user_message, reason, opts)
 
-        # Stream the fallback response to the UI if callback is available
+        # Stream the fallback response if callback is available
         if is_function(on_chunk, 1) do
           on_chunk.(fallback_response)
         end
@@ -117,8 +91,16 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
     end
   end
 
-  # Generate final response using LLM
-  defp generate_final_response(enhanced_prompt, user_message, profile, overrides, opts)
+  # Generate final response with streaming support
+  defp generate_final_response(
+         enhanced_prompt,
+         user_message,
+         profile,
+         overrides,
+         on_chunk,
+         use_streaming,
+         opts
+       )
        when not is_nil(profile) do
     # Validate enhanced prompt is available
     if is_nil(enhanced_prompt) or String.trim(enhanced_prompt) == "" do
@@ -149,30 +131,32 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
       # Record generation start time
       start_time = System.monotonic_time(:millisecond)
 
-      case AgentRuntime.Llm.Executor.execute(profile, response_overrides, llm_input, exec_meta) do
-        {:ok, %{response: response}} ->
+      # Choose streaming or non-streaming execution
+      result =
+        if use_streaming do
+          execute_with_streaming(profile, response_overrides, llm_input, exec_meta, on_chunk)
+        else
+          execute_without_streaming(profile, response_overrides, llm_input, exec_meta)
+        end
+
+      case result do
+        {:ok, response_text, token_usage} ->
           end_time = System.monotonic_time(:millisecond)
           generation_time_ms = end_time - start_time
 
-          case Response.content(response) do
-            text when is_binary(text) and text != "" ->
-              response_metadata = %{
-                generation_time_ms: generation_time_ms,
-                generation_time: DateTime.utc_now(),
-                model_used: extract_model_info(response),
-                token_usage: extract_token_usage(response),
-                enhanced_prompt_used: true,
-                fallback_used: false
-              }
+          response_metadata = %{
+            generation_time_ms: generation_time_ms,
+            generation_time: DateTime.utc_now(),
+            token_usage: token_usage,
+            enhanced_prompt_used: true,
+            fallback_used: false,
+            streaming_used: use_streaming
+          }
 
-              # Format and validate the response
-              formatted_response = format_response(text, opts)
+          # Format and validate the response
+          formatted_response = format_response(response_text, opts)
 
-              {:ok, formatted_response, response_metadata}
-
-            _ ->
-              {:error, "empty_or_invalid_response"}
-          end
+          {:ok, formatted_response, response_metadata}
 
         {:error, reason} ->
           {:error, reason}
@@ -180,8 +164,66 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
     end
   end
 
-  defp generate_final_response(_enhanced_prompt, _user_message, _profile, _overrides, _opts) do
+  defp generate_final_response(
+         _enhanced_prompt,
+         _user_message,
+         _profile,
+         _overrides,
+         _on_chunk,
+         _use_streaming,
+         _opts
+       ) do
     {:error, "no_profile"}
+  end
+
+  # Execute LLM with token streaming
+  defp execute_with_streaming(profile, overrides, llm_input, exec_meta, on_chunk) do
+    Logger.info("[FinalResponseStep] Starting streaming execution")
+
+    # Use the streaming executor
+    case AgentRuntime.Llm.Executor.execute_stream(
+           profile,
+           overrides,
+           llm_input,
+           exec_meta,
+           on_chunk
+         ) do
+      {:ok, %{response: response}} ->
+        # Extract the full response text and token usage
+        case Response.content(response) do
+          text when is_binary(text) and text != "" ->
+            token_usage = extract_token_usage(response)
+            {:ok, text, token_usage}
+
+          _ ->
+            {:error, "empty_or_invalid_response"}
+        end
+
+      {:error, reason} ->
+        Logger.error("[FinalResponseStep] Streaming execution failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  # Execute LLM without streaming (standard execution)
+  defp execute_without_streaming(profile, overrides, llm_input, exec_meta) do
+    Logger.info("[FinalResponseStep] Starting non-streaming execution")
+
+    case AgentRuntime.Llm.Executor.execute(profile, overrides, llm_input, exec_meta) do
+      {:ok, %{response: response}} ->
+        case Response.content(response) do
+          text when is_binary(text) and text != "" ->
+            token_usage = extract_token_usage(response)
+            {:ok, text, token_usage}
+
+          _ ->
+            {:error, "empty_or_invalid_response"}
+        end
+
+      {:error, reason} ->
+        Logger.error("[FinalResponseStep] Non-streaming execution failed: #{inspect(reason)}")
+        {:error, reason}
+    end
   end
 
   # Build response generation overrides with appropriate settings
@@ -285,22 +327,13 @@ defmodule AgentCore.WorkflowEngine.RagConversationWorkflow.FinalResponseStep do
   defp format_error_reason(reason) when is_binary(reason), do: reason
   defp format_error_reason(_reason), do: "system_error"
 
-  # Extract model information from LLM response
-  defp extract_model_info(response) do
-    # Try to extract model information from response metadata
-    case response do
-      %{metadata: %{model: model}} -> model
-      %{model: model} -> model
-      _ -> "unknown"
-    end
-  end
-
   # Extract token usage information from LLM response
   defp extract_token_usage(response) do
     # Try to extract token usage from response metadata
     case response do
       %{metadata: %{token_usage: usage}} -> usage
       %{token_usage: usage} -> usage
+      %{usage: usage} -> usage
       _ -> %{}
     end
   end

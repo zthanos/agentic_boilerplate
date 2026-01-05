@@ -107,6 +107,9 @@
 
 /* This file is for your main application CSS */
 
+/* Import admin-specific styles */
+@import "./admin_providers.css";
+
 /* ============================================================================
    ACCESSIBILITY STYLES
    ============================================================================ */

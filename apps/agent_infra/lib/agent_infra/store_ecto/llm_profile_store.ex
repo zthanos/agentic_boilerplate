@@ -112,7 +112,7 @@ defmodule AgentInfra.StoreEcto.LLMProfileStore do
       id: profile.id && to_string(profile.id),
       name: profile.name,
       enabled: profile.enabled,
-      provider: to_string(profile.provider),
+      provider_id: to_string(profile.provider_id),
       model: to_string(profile.model),
       policy_version: profile.policy_version,
       generation: generation_params_to_map(profile.generation),
@@ -128,7 +128,7 @@ defmodule AgentInfra.StoreEcto.LLMProfileStore do
       id: schema.id,
       name: schema.name,
       enabled: schema.enabled,
-      provider: String.to_existing_atom(schema.provider),
+      provider_id: schema.provider_id,
       model: schema.model,
       policy_version: schema.policy_version,
       generation: map_to_generation_params(schema.generation || %{}),
@@ -197,7 +197,7 @@ defmodule AgentInfra.StoreEcto.LLMProfileStore do
         from(p in q, where: p.enabled == ^enabled)
 
       {:provider, provider}, q ->
-        from(p in q, where: p.provider == ^to_string(provider))
+        from(p in q, where: p.provider_id == ^to_string(provider))
 
       {:tags, tags}, q when is_list(tags) ->
         from(p in q, where: fragment("? && ?", p.tags, ^tags))

@@ -8,7 +8,7 @@ defmodule AgentCore.Llm.Validator do
   - Errors are machine-friendly and UI-ready.
   """
 
-  alias AgentCore.Llm.{LLMProfile, Provider, ModelRef, GenerationParams, Budgets}
+  alias AgentCore.Llm.{LLMProfile, ModelRef, GenerationParams, Budgets}
 
   @type error :: %{
           field: String.t(),
@@ -24,9 +24,9 @@ defmodule AgentCore.Llm.Validator do
     errors =
       []
       |> require_string("name", profile.name)
-      |> require_struct("provider", profile.provider, Provider)
+      |> require_provider_id("provider_id", profile.provider_id)
       |> require_struct("model", profile.model, ModelRef)
-      |> validate_provider(profile.provider)
+      |> validate_provider_id(profile.provider_id)
       |> validate_model(profile.model)
       |> validate_generation(profile.generation)
       |> validate_budgets(profile.budgets)
@@ -50,27 +50,19 @@ defmodule AgentCore.Llm.Validator do
       | name: normalize_string(p.name),
         enabled: if(is_boolean(p.enabled), do: p.enabled, else: true),
         tags: normalize_tags(p.tags),
-        provider: normalize_provider(p.provider),
+        provider_id: normalize_provider_id(p.provider_id),
         model: normalize_model(p.model),
         generation: normalize_generation(p.generation),
         budgets: normalize_budgets(p.budgets)
     }
   end
 
-  defp normalize_provider(%Provider{} = pr) do
-    %Provider{
-      pr
-      | type: pr.type || :openai_compatible,
-        base_url: normalize_string(pr.base_url),
-        api_key: normalize_string(pr.api_key),
-        default_headers: pr.default_headers || %{},
-        request_timeout_ms: pr.request_timeout_ms || 60_000,
-        retries: pr.retries || 1,
-        retry_backoff_ms: pr.retry_backoff_ms || 250
-    }
+  defp normalize_provider_id(provider_id) when is_binary(provider_id) or is_integer(provider_id) do
+    to_string(provider_id)
   end
 
-  defp normalize_provider(other), do: other
+  defp normalize_provider_id(nil), do: nil
+  defp normalize_provider_id(other), do: other
 
   defp normalize_model(%ModelRef{} = m) do
     %ModelRef{
@@ -139,68 +131,23 @@ defmodule AgentCore.Llm.Validator do
 
   defp normalize_stop(_), do: nil
 
-  # ---------------------------------------------------------------------------
-  # Provider validation (typed; require_struct already executed)
-  # ---------------------------------------------------------------------------
-
-  defp validate_provider(errors, %Provider{} = p) do
-    errors
-    |> validate_provider_type(p.type)
-    |> require_string("provider.base_url", p.base_url)
-    |> validate_base_url(p.base_url)
-    |> validate_positive_int("provider.request_timeout_ms", p.request_timeout_ms,
-      min: 1_000,
-      max: 300_000
-    )
-    |> validate_int_range("provider.retries", p.retries, min: 0, max: 10)
-    |> validate_positive_int("provider.retry_backoff_ms", p.retry_backoff_ms, min: 0, max: 60_000)
-    |> validate_map("provider.default_headers", p.default_headers)
+  defp require_provider_id(errors, field_name, provider_id) do
+    case provider_id do
+      nil -> add_error(errors, field_name, :required, "Provider ID is required", nil)
+      "" -> add_error(errors, field_name, :required, "Provider ID cannot be empty", "")
+      id when is_binary(id) or is_integer(id) -> errors
+      _ -> add_error(errors, field_name, :invalid, "Provider ID must be a valid ID", provider_id)
+    end
   end
 
-  defp validate_provider_type(errors, :openai_compatible), do: errors
-
-  defp validate_provider_type(errors, other) do
-    add_error(errors, "provider.type", :unsupported, "Unsupported provider type", other)
-  end
-
-  # NOTE: strict binary clause; require_string("provider.base_url", ...) is called before.
-  defp validate_base_url(errors, base_url) when is_binary(base_url) do
-    uri = URI.parse(base_url)
-
-    errors =
-      cond do
-        uri.scheme not in ["http", "https"] ->
-          add_error(
-            errors,
-            "provider.base_url",
-            :invalid,
-            "base_url must start with http:// or https://",
-            base_url
-          )
-
-        is_nil(uri.host) ->
-          add_error(
-            errors,
-            "provider.base_url",
-            :invalid,
-            "base_url must include a host",
-            base_url
-          )
-
-        true ->
-          errors
-      end
-
-    if String.ends_with?(base_url, "/v1") do
-      errors
-    else
-      add_error(
-        errors,
-        "provider.base_url",
-        :invalid,
-        "base_url should typically end with /v1 for OpenAI-compatible servers",
-        base_url
-      )
+  defp validate_provider_id(errors, provider_id) do
+    # Simple validation - just check that it's not nil/empty
+    # More complex validation (checking database) should be done at the web layer
+    case provider_id do
+      nil -> add_error(errors, "provider_id", :required, "Provider ID is required", nil)
+      "" -> add_error(errors, "provider_id", :required, "Provider ID cannot be empty", "")
+      id when is_binary(id) or is_integer(id) -> errors
+      _ -> add_error(errors, "provider_id", :invalid, "Provider ID must be a valid ID", provider_id)
     end
   end
 

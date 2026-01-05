@@ -60,7 +60,8 @@ defmodule AgentRuntime.Providers.Registry do
     # Register default providers
     providers = %{
       openai_compatible: AgentRuntime.Providers.OpenAICompatible,
-      openai: AgentRuntime.Providers.OpenAICompatible
+      openai: AgentRuntime.Providers.OpenAICompatible,
+      fake: AgentRuntime.Providers.Fake
     }
 
     Logger.info("Provider registry started with default providers",

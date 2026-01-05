@@ -37,6 +37,7 @@ defmodule AgentWebWeb.Router do
     live "/chat", AdminChatLive, :index
     live "/settings", AdminSettingsLive, :index
     live "/profiles", AdminProfilesLive, :index
+    live "/providers", AdminProvidersLive, :index
     live "/agents", AdminAgentsLive, :index
     live "/workflows", AdminWorkflowsLive, :index
     live "/testing", AdminTestingLive, :index
